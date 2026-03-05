@@ -6,7 +6,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { 
-            margin: 0; padding: 0; background: #020205; color: #00ff00; 
+            margin: 0; padding: 0; background: #010514; color: #00ccff; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             overflow: hidden; touch-action: none;
         }
@@ -18,29 +18,28 @@
         
         #header {
             position: absolute; top: 20px; left: 0; width: 100%; text-align: center;
-            text-shadow: 0 0 10px rgba(0,255,0,0.5); pointer-events: none;
+            text-shadow: 0 0 10px rgba(0, 204, 255, 0.5); pointer-events: none;
         }
         h2 { margin: 0; font-size: 24px; letter-spacing: 2px;}
-        .subtitle { font-size: 12px; opacity: 0.7; }
+        .subtitle { font-size: 12px; opacity: 0.7; color: #fff; }
         
         .btn-search {
             position: absolute; bottom: 30px; right: 30px;
-            background: rgba(0, 255, 0, 0.1); border: 1px solid #00ff00; color: #00ff00; 
+            background: rgba(0, 204, 255, 0.1); border: 1px solid #00ccff; color: #00ccff; 
             padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 30px;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3); cursor: pointer; text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(0, 204, 255, 0.3); cursor: pointer; text-transform: uppercase;
             backdrop-filter: blur(5px); pointer-events: auto; transition: all 0.2s;
         }
-        .btn-search:active { background: rgba(0, 255, 0, 0.3); box-shadow: 0 0 25px rgba(0, 255, 0, 0.6); transform: scale(0.95); }
+        .btn-search:active { background: rgba(0, 204, 255, 0.3); box-shadow: 0 0 25px rgba(0, 204, 255, 0.6); transform: scale(0.95); }
         .btn-search:disabled { border-color: #555; color: #555; box-shadow: none; pointer-events: none; }
         
-        /* Прицел по центру экрана */
         .crosshair {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 60vw; height: 60vw; border: 1px solid rgba(0, 255, 0, 0.3); border-radius: 20px;
-            pointer-events: none; box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+            width: 60vw; height: 60vw; border: 1px solid rgba(0, 204, 255, 0.3); border-radius: 20px;
+            pointer-events: none; box-shadow: inset 0 0 20px rgba(0, 204, 255, 0.1);
         }
         .crosshair::before, .crosshair::after {
-            content: ''; position: absolute; background: rgba(0, 255, 0, 0.5);
+            content: ''; position: absolute; background: rgba(0, 204, 255, 0.5);
         }
         .crosshair::before { top: 50%; left: -10px; right: -10px; height: 1px; }
         .crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 1px; }
@@ -74,7 +73,6 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Камера и физика
         let camera = { x: 0, y: 0, zoom: 1 };
         let velocity = { x: 0, y: 0 };
         
@@ -83,121 +81,149 @@
         let initialPinchDistance = null;
         let initialZoom = 1;
         
-        // История сканирования (сохраняем в localStorage чтобы не пропадало)
         let scannedAreas = JSON.parse(localStorage.getItem('scannedAreas') || '[]');
 
-        // Генерируем статические звезды один раз (многослойный параллакс)
-        const stars = [];
-        // Создаем больше звезд для бесконечного эффекта
-        for(let i=0; i<1500; i++) {
-            stars.push({
-                x: (Math.random() - 0.5) * 10000,
-                y: (Math.random() - 0.5) * 10000,
-                size: Math.random() * 1.5 + 0.5,
-                depth: Math.random() * 0.9 + 0.1, // глубина для параллакса
-                baseAlpha: Math.random() * 0.5 + 0.3 // базовая яркость
-            });
+        function pseudoRandom(x, y) {
+            let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+            return h - Math.floor(h);
         }
 
         function draw() {
-            ctx.fillStyle = "#020205";
+            ctx.fillStyle = "#010514";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
-
-            // Рисуем звезды с параллаксом
-            for(let star of stars) {
-                // Движение звезд зависит от глубины
-                let sx = (star.x - camera.x * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.5);
-                let sy = (star.y - camera.y * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.5);
-                
-                // Рисуем только то, что в кадре
-                if(sx > -canvas.width/2 && sx < canvas.width/2 && sy > -canvas.height/2 && sy < canvas.height/2) {
-                    // Яркость звезды зависит от зума (чем ближе зум, тем больше мелких звезд проявляется)
-                    // Это создает эффект погружения вглубь космоса
-                    let apparentSize = star.size * (1 + Math.log10(Math.max(1, camera.zoom)) * star.depth);
-                    let alpha = star.baseAlpha * Math.min(1, Math.max(0.1, camera.zoom * star.depth * 0.5));
-                    
-                    if (alpha > 0.05) {
-                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-                        ctx.beginPath();
-                        ctx.arc(sx, sy, Math.min(3, apparentSize), 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-            }
             
-            // Применяем зум мира для сетки и пятен
+            // Масштабируем всё пространство
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
 
-            // Рисуем сетку (мягкую)
-            ctx.strokeStyle = "rgba(0, 255, 0, 0.03)";
-            ctx.lineWidth = 1 / camera.zoom;
-            const gridSize = 200; 
-            
-            const left = camera.x - (canvas.width / 2) / camera.zoom;
-            const right = camera.x + (canvas.width / 2) / camera.zoom;
-            const top = camera.y - (canvas.height / 2) / camera.zoom;
-            const bottom = camera.y + (canvas.height / 2) / camera.zoom;
+            const viewLeft = camera.x - (canvas.width / 2) / camera.zoom;
+            const viewRight = camera.x + (canvas.width / 2) / camera.zoom;
+            const viewTop = camera.y - (canvas.height / 2) / camera.zoom;
+            const viewBottom = camera.y + (canvas.height / 2) / camera.zoom;
 
-            const startX = Math.floor(left / gridSize) * gridSize;
-            const startY = Math.floor(top / gridSize) * gridSize;
+            // Фрактальные процедурные звезды
+            // Определяем базовый уровень масштаба
+            let baseL = Math.floor(Math.log2(camera.zoom));
+            
+            // Рисуем 4 слоя звезд для создания эффекта бесконечного появления
+            for(let l = baseL - 2; l <= baseL + 1; l++) {
+                // Размер ячейки мира для этого слоя
+                let gridSize = 1000 / Math.pow(2, l);
+                
+                // Прозрачность слоя (плавное появление и исчезновение)
+                // Чем ближе зум к уровню слоя, тем он ярче
+                let layerAlpha = 1 - Math.abs((Math.log2(camera.zoom) - l - 0.5));
+                if (layerAlpha < 0) continue;
+
+                let startX = Math.floor(viewLeft / gridSize) * gridSize;
+                let startY = Math.floor(viewTop / gridSize) * gridSize;
+
+                for (let x = startX; x < viewRight; x += gridSize) {
+                    for (let y = startY; y < viewBottom; y += gridSize) {
+                        let hash1 = pseudoRandom(x, y);
+                        // Если в этой ячейке есть звезда
+                        if(hash1 > 0.4) {
+                            let hash2 = pseudoRandom(x + 1, y + 1);
+                            let hash3 = pseudoRandom(x + 2, y + 2);
+                            
+                            // Смещение внутри ячейки
+                            let starX = x + hash2 * gridSize;
+                            let starY = y + hash3 * gridSize;
+                            
+                            // Звезды на разных слоях имеют разный параллакс-сдвиг
+                            let depth = 1 - (hash1 * 0.5); // 0.5 - 1.0
+                            
+                            // Вычисляем финальные координаты с учетом микро-параллакса камеры
+                            let px = starX + camera.x * (1 - depth);
+                            let py = starY + camera.y * (1 - depth);
+
+                            // Оставляем только те, что попадают в экран
+                            if (px > viewLeft && px < viewRight && py > viewTop && py < viewBottom) {
+                                ctx.fillStyle = `rgba(200, 230, 255, ${layerAlpha * hash1})`;
+                                ctx.beginPath();
+                                // Размер зависит от слоя, чтобы не превращаться в огромные блины
+                                let radius = (hash2 * 2 + 0.5) / camera.zoom * Math.pow(2, l - baseL + 1);
+                                ctx.arc(px, py, Math.max(0.5 / camera.zoom, radius), 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Рисуем сетку
+            ctx.strokeStyle = "rgba(0, 204, 255, 0.05)";
+            ctx.lineWidth = 1 / camera.zoom;
+            const mainGrid = 500; 
+            const sx = Math.floor(viewLeft / mainGrid) * mainGrid;
+            const sy = Math.floor(viewTop / mainGrid) * mainGrid;
 
             ctx.beginPath();
-            for (let x = startX; x < right; x += gridSize) {
-                ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+            for (let x = sx; x < viewRight; x += mainGrid) {
+                ctx.moveTo(x, viewTop); ctx.lineTo(x, viewBottom);
             }
-            for (let y = startY; y < bottom; y += gridSize) {
-                ctx.moveTo(left, y); ctx.lineTo(right, y);
+            for (let y = sy; y < viewBottom; y += mainGrid) {
+                ctx.moveTo(viewLeft, y); ctx.lineTo(viewRight, y);
             }
             ctx.stroke();
 
-            // Рисуем просканированные пятна
+            // Рисуем просканированные зоны
             for(let area of scannedAreas) {
-                let grad = ctx.createRadialGradient(area.x, area.y, 0, area.x, area.y, area.radius);
-                grad.addColorStop(0, 'rgba(0, 255, 0, 0.15)');
-                grad.addColorStop(1, 'rgba(0, 255, 0, 0)');
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.save();
+                ctx.translate(area.x, area.y);
                 
-                ctx.strokeStyle = "rgba(0, 255, 0, 0.3)";
-                ctx.lineWidth = 2 / camera.zoom;
-                ctx.strokeRect(area.x - area.radius/2, area.y - area.radius/2, area.radius, area.radius);
+                let screenRadius = area.radius * camera.zoom;
+                
+                if (screenRadius < 10) {
+                    // Если сильно отдалили - показываем как яркую золотую звезду (маяк)
+                    ctx.fillStyle = "#ffaa00"; 
+                    ctx.shadowBlur = 10 / camera.zoom;
+                    ctx.shadowColor = "#ffaa00";
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 5 / camera.zoom, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // Нормальный вид при зуме (синяя туманность)
+                    let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, area.radius);
+                    grad.addColorStop(0, 'rgba(0, 204, 255, 0.2)');
+                    grad.addColorStop(1, 'rgba(0, 204, 255, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, area.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = "rgba(0, 204, 255, 0.4)";
+                    ctx.lineWidth = 2 / camera.zoom;
+                    ctx.strokeRect(-area.radius/2, -area.radius/2, area.radius, area.radius);
+                }
+                ctx.restore();
             }
 
             ctx.restore();
         }
 
-        // Физика инерции (RequestAnimationFrame loop)
         function updatePhysics() {
             if(!isDragging) {
                 camera.x += velocity.x;
                 camera.y += velocity.y;
-                
-                // Затухание (трение). Чем ближе к 1, тем дольше скользит. Было 0.92, стало 0.97
-                velocity.x *= 0.97;
-                velocity.y *= 0.97;
-                
-                // Останавливаем, если скорость микроскопическая
-                if(Math.abs(velocity.x) < 0.05) velocity.x = 0;
-                if(Math.abs(velocity.y) < 0.05) velocity.y = 0;
+                velocity.x *= 0.96;
+                velocity.y *= 0.96;
+                if(Math.abs(velocity.x) < 0.01 / camera.zoom) velocity.x = 0;
+                if(Math.abs(velocity.y) < 0.01 / camera.zoom) velocity.y = 0;
             }
-            
             draw();
             requestAnimationFrame(updatePhysics);
         }
-        updatePhysics(); // Запускаем цикл
+        updatePhysics();
 
-        // Touch events
         canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 isDragging = true;
                 lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
-                velocity = { x: 0, y: 0 }; // сброс инерции при касании
+                velocity = { x: 0, y: 0 };
             } else if (e.touches.length === 2) {
                 isDragging = false;
                 initialPinchDistance = Math.hypot(
@@ -212,7 +238,6 @@
             e.preventDefault(); 
             if (isDragging && e.touches.length === 1) {
                 const currentTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
-                
                 const dx = currentTouch.x - lastTouch.x;
                 const dy = currentTouch.y - lastTouch.y;
                 const dt = currentTouch.time - lastTouch.time;
@@ -220,12 +245,10 @@
                 camera.x -= dx / camera.zoom;
                 camera.y -= dy / camera.zoom;
                 
-                // Считаем скорость для инерции (ограничиваем dt чтобы не было деления на 0)
                 if(dt > 0) {
                     velocity.x = -(dx / camera.zoom) / dt * 15;
                     velocity.y = -(dy / camera.zoom) / dt * 15;
                 }
-                
                 lastTouch = currentTouch;
                 
             } else if (e.touches.length === 2 && initialPinchDistance) {
@@ -233,10 +256,11 @@
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                camera.zoom = Math.max(0.01, Math.min(100000, initialZoom * (currentDistance / initialPinchDistance)));
+                camera.zoom = Math.max(0.0001, Math.min(1000000, initialZoom * (currentDistance / initialPinchDistance)));
                 
-                // Обновляем статус
-                document.getElementById("status").innerText = `Масштаб: ${(camera.zoom * 100).toFixed(0)}%`;
+                // Форматирование зума
+                let zoomText = camera.zoom < 1 ? `1:${Math.round(1/camera.zoom)}` : `${Math.round(camera.zoom)}x`;
+                document.getElementById("status").innerText = `Масштаб: ${zoomText}`;
             }
         });
 
@@ -247,35 +271,29 @@
             }
         });
 
-        // Кнопка ПОИСК
         searchBtn.addEventListener('click', () => {
-            searchBtn.innerText = "ИЩУ...";
+            searchBtn.innerText = "СКАНИРОВАНИЕ...";
             searchBtn.disabled = true;
             try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e){}
             
-            // Вычисляем размер захваченной области на основе зума
             const viewWidth = canvas.width / camera.zoom;
-            const scanRadius = viewWidth * 0.4; // 40% от ширины экрана
+            const scanRadius = viewWidth * 0.4;
             
-            // Сохраняем "пятно" сканирования
             scannedAreas.push({
                 x: camera.x,
                 y: camera.y,
                 radius: scanRadius
             });
-            // Храним максимум 50 последних зон
-            if(scannedAreas.length > 50) scannedAreas.shift();
+            if(scannedAreas.length > 100) scannedAreas.shift();
             localStorage.setItem('scannedAreas', JSON.stringify(scannedAreas));
             
-            // Отправляем данные боту (наш экран - это и есть рамка)
             setTimeout(() => {
                 tg.sendData(JSON.stringify({
                     action: "scan_viewport",
-                    centerX: camera.x.toFixed(2),
-                    centerY: camera.y.toFixed(2),
+                    centerX: camera.x.toFixed(4),
+                    centerY: camera.y.toFixed(4),
                     zoomLevel: camera.zoom.toFixed(4)
                 }));
-                // Возвращаем кнопку в исходное состояние (если окно не закроется)
                 setTimeout(() => {
                     searchBtn.innerText = "ПОИСК";
                     searchBtn.disabled = false;
