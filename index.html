@@ -88,12 +88,14 @@
 
         // Генерируем статические звезды один раз (многослойный параллакс)
         const stars = [];
-        for(let i=0; i<300; i++) {
+        // Создаем больше звезд для бесконечного эффекта
+        for(let i=0; i<1500; i++) {
             stars.push({
-                x: Math.random() * 4000 - 2000,
-                y: Math.random() * 4000 - 2000,
+                x: (Math.random() - 0.5) * 10000,
+                y: (Math.random() - 0.5) * 10000,
                 size: Math.random() * 1.5 + 0.5,
-                depth: Math.random() * 0.8 + 0.2 // глубина для параллакса
+                depth: Math.random() * 0.9 + 0.1, // глубина для параллакса
+                baseAlpha: Math.random() * 0.5 + 0.3 // базовая яркость
             });
         }
 
@@ -104,18 +106,25 @@
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
 
-            // Рисуем звезды с параллаксом (они не масштабируются жестко, чтобы не слепить)
-            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            // Рисуем звезды с параллаксом
             for(let star of stars) {
                 // Движение звезд зависит от глубины
-                let sx = (star.x - camera.x * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.2);
-                let sy = (star.y - camera.y * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.2);
+                let sx = (star.x - camera.x * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.5);
+                let sy = (star.y - camera.y * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.5);
                 
                 // Рисуем только то, что в кадре
-                if(sx > -canvas.width && sx < canvas.width && sy > -canvas.height && sy < canvas.height) {
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
-                    ctx.fill();
+                if(sx > -canvas.width/2 && sx < canvas.width/2 && sy > -canvas.height/2 && sy < canvas.height/2) {
+                    // Яркость звезды зависит от зума (чем ближе зум, тем больше мелких звезд проявляется)
+                    // Это создает эффект погружения вглубь космоса
+                    let apparentSize = star.size * (1 + Math.log10(Math.max(1, camera.zoom)) * star.depth);
+                    let alpha = star.baseAlpha * Math.min(1, Math.max(0.1, camera.zoom * star.depth * 0.5));
+                    
+                    if (alpha > 0.05) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, Math.min(3, apparentSize), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
             
@@ -124,7 +133,7 @@
             ctx.translate(-camera.x, -camera.y);
 
             // Рисуем сетку (мягкую)
-            ctx.strokeStyle = "rgba(0, 255, 0, 0.05)";
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.03)";
             ctx.lineWidth = 1 / camera.zoom;
             const gridSize = 200; 
             
@@ -169,13 +178,13 @@
                 camera.x += velocity.x;
                 camera.y += velocity.y;
                 
-                // Затухание (трение)
-                velocity.x *= 0.92;
-                velocity.y *= 0.92;
+                // Затухание (трение). Чем ближе к 1, тем дольше скользит. Было 0.92, стало 0.97
+                velocity.x *= 0.97;
+                velocity.y *= 0.97;
                 
                 // Останавливаем, если скорость микроскопическая
-                if(Math.abs(velocity.x) < 0.1) velocity.x = 0;
-                if(Math.abs(velocity.y) < 0.1) velocity.y = 0;
+                if(Math.abs(velocity.x) < 0.05) velocity.x = 0;
+                if(Math.abs(velocity.y) < 0.05) velocity.y = 0;
             }
             
             draw();
