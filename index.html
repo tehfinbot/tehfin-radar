@@ -6,81 +6,127 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { 
-            margin: 0; padding: 0; background: #050510; color: #00ff00; 
-            font-family: monospace; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; height: 100vh; overflow: hidden; 
+            margin: 0; padding: 0; background: #020205; color: #00ff00; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; touch-action: none;
         }
-        #canvas-container { 
-            position: relative; width: 100vw; height: 70vh; 
-            border-bottom: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00; 
-            cursor: crosshair; touch-action: none; 
+        #spaceCanvas { width: 100vw; height: 100vh; display: block; }
+        
+        .ui-layer {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none;
         }
-        canvas { width: 100%; height: 100%; display: block; }
-        .ui-panel {
-            height: 30vh; width: 100%; display: flex; flex-direction: column; 
-            align-items: center; justify-content: space-evenly; text-align: center;
-            padding: 10px; box-sizing: border-box; background: #000;
+        
+        #header {
+            position: absolute; top: 20px; left: 0; width: 100%; text-align: center;
+            text-shadow: 0 0 10px rgba(0,255,0,0.5); pointer-events: none;
         }
-        h2 { margin: 0; text-shadow: 0 0 5px #00ff00; font-size: 18px;}
-        .instructions { font-size: 11px; opacity: 0.8;}
-        #status { font-weight: bold; color: #fff; font-size: 12px; margin-bottom: 10px;}
-        .btn-scan {
-            background: #00ff00; color: #000; border: none; padding: 12px 25px;
-            font-size: 16px; font-weight: bold; border-radius: 8px;
-            box-shadow: 0 0 10px #00ff00; cursor: pointer; text-transform: uppercase;
+        h2 { margin: 0; font-size: 24px; letter-spacing: 2px;}
+        .subtitle { font-size: 12px; opacity: 0.7; }
+        
+        .btn-search {
+            position: absolute; bottom: 30px; right: 30px;
+            background: rgba(0, 255, 0, 0.1); border: 1px solid #00ff00; color: #00ff00; 
+            padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 30px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3); cursor: pointer; text-transform: uppercase;
+            backdrop-filter: blur(5px); pointer-events: auto; transition: all 0.2s;
         }
-        .btn-scan:active { background: #00cc00; box-shadow: 0 0 5px #00cc00; }
-        .btn-scan:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
+        .btn-search:active { background: rgba(0, 255, 0, 0.3); box-shadow: 0 0 25px rgba(0, 255, 0, 0.6); transform: scale(0.95); }
+        .btn-search:disabled { border-color: #555; color: #555; box-shadow: none; pointer-events: none; }
+        
+        /* Прицел по центру экрана */
+        .crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 60vw; height: 60vw; border: 1px solid rgba(0, 255, 0, 0.3); border-radius: 20px;
+            pointer-events: none; box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+        .crosshair::before, .crosshair::after {
+            content: ''; position: absolute; background: rgba(0, 255, 0, 0.5);
+        }
+        .crosshair::before { top: 50%; left: -10px; right: -10px; height: 1px; }
+        .crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 1px; }
     </style>
 </head>
 <body>
-    <div id="canvas-container">
-        <canvas id="spaceCanvas"></canvas>
-    </div>
-    <div class="ui-panel">
-        <h2>QUANTUM SPACE</h2>
-        <div class="instructions">Перемещайте карту и масштабируйте (щипок).<br>Выберите счастливый квадрат для перебора.</div>
-        <div id="status">Зум: 1.0x | Сектор не выбран</div>
-        <button id="scanBtn" class="btn-scan" disabled>СКАНИРОВАТЬ СЕКТОР</button>
+    <canvas id="spaceCanvas"></canvas>
+    
+    <div class="ui-layer">
+        <div id="header">
+            <h2>QUANTUM SPACE</h2>
+            <div class="subtitle" id="status">Наведи сканер и нажми поиск</div>
+        </div>
+        <div class="crosshair"></div>
+        <button id="searchBtn" class="btn-search">ПОИСК</button>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
+        tg.enableClosingConfirmation();
 
         const canvas = document.getElementById("spaceCanvas");
         const ctx = canvas.getContext("2d");
-        const scanBtn = document.getElementById("scanBtn");
+        const searchBtn = document.getElementById("searchBtn");
         
         function resize() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resize);
         resize();
 
+        // Камера и физика
         let camera = { x: 0, y: 0, zoom: 1 };
+        let velocity = { x: 0, y: 0 };
+        
         let isDragging = false;
-        let dragStart = { x: 0, y: 0 };
+        let lastTouch = null;
         let initialPinchDistance = null;
         let initialZoom = 1;
         
-        // Выбранный пользователем квадрат (мир. координаты)
-        let selectedTarget = null; 
+        // История сканирования (сохраняем в localStorage чтобы не пропадало)
+        let scannedAreas = JSON.parse(localStorage.getItem('scannedAreas') || '[]');
 
-        function drawSpace() {
-            ctx.fillStyle = "#050510";
+        // Генерируем статические звезды один раз (многослойный параллакс)
+        const stars = [];
+        for(let i=0; i<300; i++) {
+            stars.push({
+                x: Math.random() * 4000 - 2000,
+                y: Math.random() * 4000 - 2000,
+                size: Math.random() * 1.5 + 0.5,
+                depth: Math.random() * 0.8 + 0.2 // глубина для параллакса
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = "#020205";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
+
+            // Рисуем звезды с параллаксом (они не масштабируются жестко, чтобы не слепить)
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            for(let star of stars) {
+                // Движение звезд зависит от глубины
+                let sx = (star.x - camera.x * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.2);
+                let sy = (star.y - camera.y * star.depth) * (1 + (camera.zoom - 1) * star.depth * 0.2);
+                
+                // Рисуем только то, что в кадре
+                if(sx > -canvas.width && sx < canvas.width && sy > -canvas.height && sy < canvas.height) {
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Применяем зум мира для сетки и пятен
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
 
-            ctx.strokeStyle = "rgba(0, 255, 0, 0.15)";
+            // Рисуем сетку (мягкую)
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.05)";
             ctx.lineWidth = 1 / camera.zoom;
-            // Делаем ячейки сетки фиксированного размера в мире
-            const gridSize = 100; 
+            const gridSize = 200; 
             
             const left = camera.x - (canvas.width / 2) / camera.zoom;
             const right = camera.x + (canvas.width / 2) / camera.zoom;
@@ -99,48 +145,50 @@
             }
             ctx.stroke();
 
-            // Рисуем звезды
-            ctx.fillStyle = "#fff";
-            for (let x = startX; x < right; x += gridSize) {
-                for (let y = startY; y < bottom; y += gridSize) {
-                    let hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-                    hash = hash - Math.floor(hash);
-                    if(hash > 0.6) {
-                        ctx.beginPath();
-                        ctx.arc(x + gridSize/2, y + gridSize/2, (hash * 3) / camera.zoom, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-            }
-            
-            // Рисуем рамку выбора (если есть)
-            if (selectedTarget) {
-                ctx.strokeStyle = "red";
-                ctx.lineWidth = 3 / camera.zoom;
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = "red";
-                ctx.strokeRect(selectedTarget.gridX, selectedTarget.gridY, gridSize, gridSize);
-                ctx.shadowBlur = 0; // сбрасываем тень
-                ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
-                ctx.fillRect(selectedTarget.gridX, selectedTarget.gridY, gridSize, gridSize);
+            // Рисуем просканированные пятна
+            for(let area of scannedAreas) {
+                let grad = ctx.createRadialGradient(area.x, area.y, 0, area.x, area.y, area.radius);
+                grad.addColorStop(0, 'rgba(0, 255, 0, 0.15)');
+                grad.addColorStop(1, 'rgba(0, 255, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = "rgba(0, 255, 0, 0.3)";
+                ctx.lineWidth = 2 / camera.zoom;
+                ctx.strokeRect(area.x - area.radius/2, area.y - area.radius/2, area.radius, area.radius);
             }
 
             ctx.restore();
-            
-            let statusText = `Зум: ${camera.zoom.toFixed(1)}x`;
-            if(selectedTarget) {
-                statusText += ` | Сектор [${selectedTarget.gridX/100}, ${selectedTarget.gridY/100}]`;
-            }
-            document.getElementById("status").innerText = statusText;
         }
 
-        drawSpace();
+        // Физика инерции (RequestAnimationFrame loop)
+        function updatePhysics() {
+            if(!isDragging) {
+                camera.x += velocity.x;
+                camera.y += velocity.y;
+                
+                // Затухание (трение)
+                velocity.x *= 0.92;
+                velocity.y *= 0.92;
+                
+                // Останавливаем, если скорость микроскопическая
+                if(Math.abs(velocity.x) < 0.1) velocity.x = 0;
+                if(Math.abs(velocity.y) < 0.1) velocity.y = 0;
+            }
+            
+            draw();
+            requestAnimationFrame(updatePhysics);
+        }
+        updatePhysics(); // Запускаем цикл
 
         // Touch events
         canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 isDragging = true;
-                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+                velocity = { x: 0, y: 0 }; // сброс инерции при касании
             } else if (e.touches.length === 2) {
                 isDragging = false;
                 initialPinchDistance = Math.hypot(
@@ -151,25 +199,35 @@
             }
         });
 
-        let moved = false;
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault(); 
             if (isDragging && e.touches.length === 1) {
-                moved = true;
-                const dx = e.touches[0].clientX - dragStart.x;
-                const dy = e.touches[0].clientY - dragStart.y;
+                const currentTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+                
+                const dx = currentTouch.x - lastTouch.x;
+                const dy = currentTouch.y - lastTouch.y;
+                const dt = currentTouch.time - lastTouch.time;
+                
                 camera.x -= dx / camera.zoom;
                 camera.y -= dy / camera.zoom;
-                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                drawSpace();
+                
+                // Считаем скорость для инерции (ограничиваем dt чтобы не было деления на 0)
+                if(dt > 0) {
+                    velocity.x = -(dx / camera.zoom) / dt * 15;
+                    velocity.y = -(dy / camera.zoom) / dt * 15;
+                }
+                
+                lastTouch = currentTouch;
+                
             } else if (e.touches.length === 2 && initialPinchDistance) {
-                moved = true;
                 const currentDistance = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                camera.zoom = Math.max(0.1, Math.min(100, initialZoom * (currentDistance / initialPinchDistance)));
-                drawSpace();
+                camera.zoom = Math.max(0.01, Math.min(100000, initialZoom * (currentDistance / initialPinchDistance)));
+                
+                // Обновляем статус
+                document.getElementById("status").innerText = `Масштаб: ${(camera.zoom * 100).toFixed(0)}%`;
             }
         });
 
@@ -180,45 +238,40 @@
             }
         });
 
-        // Клик по карте для выбора сектора
-        canvas.addEventListener('click', (e) => {
-            if(moved) { moved = false; return; } // Если был свайп - не считаем за клик
-            
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.clientX - rect.left;
-            const clientY = e.clientY - rect.top;
-
-            const worldX = (clientX - canvas.width / 2) / camera.zoom + camera.x;
-            const worldY = (clientY - canvas.height / 2) / camera.zoom + camera.y;
-
-            // Вычисляем левый верхний угол "квадрата" (ячейки сетки)
-            const gridSize = 100;
-            const gridX = Math.floor(worldX / gridSize) * gridSize;
-            const gridY = Math.floor(worldY / gridSize) * gridSize;
-
-            selectedTarget = { gridX, gridY };
-            scanBtn.disabled = false;
-            
-            try { tg.HapticFeedback.impactOccurred("light"); } catch(e){}
-            drawSpace();
-        });
-
-        // Кнопка сканирования
-        scanBtn.addEventListener('click', () => {
-            if(!selectedTarget) return;
-            
-            scanBtn.innerText = "ОТПРАВКА...";
-            scanBtn.disabled = true;
+        // Кнопка ПОИСК
+        searchBtn.addEventListener('click', () => {
+            searchBtn.innerText = "ИЩУ...";
+            searchBtn.disabled = true;
             try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e){}
             
+            // Вычисляем размер захваченной области на основе зума
+            const viewWidth = canvas.width / camera.zoom;
+            const scanRadius = viewWidth * 0.4; // 40% от ширины экрана
+            
+            // Сохраняем "пятно" сканирования
+            scannedAreas.push({
+                x: camera.x,
+                y: camera.y,
+                radius: scanRadius
+            });
+            // Храним максимум 50 последних зон
+            if(scannedAreas.length > 50) scannedAreas.shift();
+            localStorage.setItem('scannedAreas', JSON.stringify(scannedAreas));
+            
+            // Отправляем данные боту (наш экран - это и есть рамка)
             setTimeout(() => {
                 tg.sendData(JSON.stringify({
-                    action: "scan_sector",
-                    sectorX: selectedTarget.gridX / 100,
-                    sectorY: selectedTarget.gridY / 100,
-                    zoomLevel: camera.zoom.toFixed(2)
+                    action: "scan_viewport",
+                    centerX: camera.x.toFixed(2),
+                    centerY: camera.y.toFixed(2),
+                    zoomLevel: camera.zoom.toFixed(4)
                 }));
-            }, 500);
+                // Возвращаем кнопку в исходное состояние (если окно не закроется)
+                setTimeout(() => {
+                    searchBtn.innerText = "ПОИСК";
+                    searchBtn.disabled = false;
+                }, 2000);
+            }, 300);
         });
 
     </script>
