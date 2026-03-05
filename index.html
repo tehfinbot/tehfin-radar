@@ -23,8 +23,9 @@
         h2 { margin: 0; font-size: 24px; letter-spacing: 2px;}
         .subtitle { font-size: 12px; opacity: 0.7; color: #fff; }
         
+        /* Кнопка ПОИСК справа */
         .btn-search {
-            position: absolute; bottom: 30px; right: 30px;
+            position: absolute; bottom: 30px; right: 20px;
             background: rgba(0, 204, 255, 0.1); border: 1px solid #00ccff; color: #00ccff; 
             padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 30px;
             box-shadow: 0 0 15px rgba(0, 204, 255, 0.3); cursor: pointer; text-transform: uppercase;
@@ -33,6 +34,37 @@
         .btn-search:active { background: rgba(0, 204, 255, 0.3); box-shadow: 0 0 25px rgba(0, 204, 255, 0.6); transform: scale(0.95); }
         .btn-search:disabled { border-color: #555; color: #555; box-shadow: none; pointer-events: none; }
         
+        /* Джойстик ЗУМА слева */
+        #zoom-slider-container {
+            position: absolute; bottom: 30px; left: 20px;
+            width: 50px; height: 150px;
+            background: rgba(0, 204, 255, 0.1);
+            border: 1px solid rgba(0, 204, 255, 0.3);
+            border-radius: 25px;
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        #zoom-knob {
+            position: absolute; top: 50%; left: 5px;
+            width: 40px; height: 40px;
+            background: #00ccff;
+            border-radius: 50%;
+            transform: translateY(-50%);
+            box-shadow: 0 0 15px #00ccff;
+            cursor: ns-resize;
+            transition: transform 0.1s ease-out; /* Плавный возврат в центр */
+        }
+        
+        .zoom-icon {
+            color: rgba(0, 204, 255, 0.5); font-weight: bold; font-size: 20px;
+            position: absolute; pointer-events: none;
+        }
+        .zoom-plus { top: 10px; }
+        .zoom-minus { bottom: 10px; }
+
+        /* Прицел по центру экрана */
         .crosshair {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 60vw; height: 60vw; border: 1px solid rgba(0, 204, 255, 0.3); border-radius: 20px;
@@ -53,7 +85,15 @@
             <h2>QUANTUM SPACE</h2>
             <div class="subtitle" id="status">Наведи сканер и нажми поиск</div>
         </div>
+        
         <div class="crosshair"></div>
+        
+        <div id="zoom-slider-container">
+            <div class="zoom-icon zoom-plus">+</div>
+            <div class="zoom-icon zoom-minus">-</div>
+            <div id="zoom-knob"></div>
+        </div>
+
         <button id="searchBtn" class="btn-search">ПОИСК</button>
     </div>
 
@@ -65,6 +105,12 @@
         const canvas = document.getElementById("spaceCanvas");
         const ctx = canvas.getContext("2d");
         const searchBtn = document.getElementById("searchBtn");
+        
+        // Переменные для джойстика
+        const knob = document.getElementById("zoom-knob");
+        const sliderContainer = document.getElementById("zoom-slider-container");
+        let isKnobDragging = false;
+        let zoomSpeed = 0; // от -1 до 1
         
         function resize() {
             canvas.width = window.innerWidth;
@@ -80,6 +126,8 @@
         let lastTouch = null;
         let initialPinchDistance = null;
         let initialZoom = 1;
+        // Координаты центра экрана при начале зума (для правильного скейла в точку)
+        let pinchCenter = {x: 0, y: 0};
         
         let scannedAreas = JSON.parse(localStorage.getItem('scannedAreas') || '[]');
 
@@ -94,8 +142,6 @@
             
             ctx.save();
             ctx.translate(canvas.width / 2, canvas.height / 2);
-            
-            // Масштабируем всё пространство
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
 
@@ -104,19 +150,12 @@
             const viewTop = camera.y - (canvas.height / 2) / camera.zoom;
             const viewBottom = camera.y + (canvas.height / 2) / camera.zoom;
 
-            // Фрактальные процедурные звезды
-            // Определяем базовый уровень масштаба
             let baseL = Math.floor(Math.log2(camera.zoom));
             
-            // Рисуем 4 слоя звезд для создания эффекта бесконечного появления
             for(let l = baseL - 2; l <= baseL + 1; l++) {
-                // Размер ячейки мира для этого слоя
                 let gridSize = 1000 / Math.pow(2, l);
-                
-                // Прозрачность слоя (плавное появление и исчезновение)
-                // Чем ближе зум к уровню слоя, тем он ярче
                 let layerAlpha = 1 - Math.abs((Math.log2(camera.zoom) - l - 0.5));
-                if (layerAlpha < 0) continue;
+                if (layerAlpha <= 0) continue;
 
                 let startX = Math.floor(viewLeft / gridSize) * gridSize;
                 let startY = Math.floor(viewTop / gridSize) * gridSize;
@@ -124,51 +163,29 @@
                 for (let x = startX; x < viewRight; x += gridSize) {
                     for (let y = startY; y < viewBottom; y += gridSize) {
                         let hash1 = pseudoRandom(x, y);
-                        // Если в этой ячейке есть звезда
                         if(hash1 > 0.4) {
                             let hash2 = pseudoRandom(x + 1, y + 1);
                             let hash3 = pseudoRandom(x + 2, y + 2);
                             
-                            // Смещение внутри ячейки
                             let starX = x + hash2 * gridSize;
                             let starY = y + hash3 * gridSize;
                             
-                            // Звезды на разных слоях имеют разный параллакс-сдвиг
-                            let depth = 1 - (hash1 * 0.5); // 0.5 - 1.0
+                            let depth = 1 - (hash1 * 0.5); 
                             
-                            // Вычисляем финальные координаты с учетом микро-параллакса камеры
                             let px = starX + camera.x * (1 - depth);
                             let py = starY + camera.y * (1 - depth);
 
-                            // Оставляем только те, что попадают в экран
                             if (px > viewLeft && px < viewRight && py > viewTop && py < viewBottom) {
                                 ctx.fillStyle = `rgba(200, 230, 255, ${layerAlpha * hash1})`;
                                 ctx.beginPath();
-                                // Размер зависит от слоя, чтобы не превращаться в огромные блины
                                 let radius = (hash2 * 2 + 0.5) / camera.zoom * Math.pow(2, l - baseL + 1);
-                                ctx.arc(px, py, Math.max(0.5 / camera.zoom, radius), 0, Math.PI * 2);
+                                ctx.arc(px, py, Math.max(0.5 / camera.zoom, Math.min(5/camera.zoom, radius)), 0, Math.PI * 2);
                                 ctx.fill();
                             }
                         }
                     }
                 }
             }
-
-            // Рисуем сетку
-            ctx.strokeStyle = "rgba(0, 204, 255, 0.05)";
-            ctx.lineWidth = 1 / camera.zoom;
-            const mainGrid = 500; 
-            const sx = Math.floor(viewLeft / mainGrid) * mainGrid;
-            const sy = Math.floor(viewTop / mainGrid) * mainGrid;
-
-            ctx.beginPath();
-            for (let x = sx; x < viewRight; x += mainGrid) {
-                ctx.moveTo(x, viewTop); ctx.lineTo(x, viewBottom);
-            }
-            for (let y = sy; y < viewBottom; y += mainGrid) {
-                ctx.moveTo(viewLeft, y); ctx.lineTo(viewRight, y);
-            }
-            ctx.stroke();
 
             // Рисуем просканированные зоны
             for(let area of scannedAreas) {
@@ -178,7 +195,6 @@
                 let screenRadius = area.radius * camera.zoom;
                 
                 if (screenRadius < 10) {
-                    // Если сильно отдалили - показываем как яркую золотую звезду (маяк)
                     ctx.fillStyle = "#ffaa00"; 
                     ctx.shadowBlur = 10 / camera.zoom;
                     ctx.shadowColor = "#ffaa00";
@@ -186,7 +202,6 @@
                     ctx.arc(0, 0, 5 / camera.zoom, 0, Math.PI * 2);
                     ctx.fill();
                 } else {
-                    // Нормальный вид при зуме (синяя туманность)
                     let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, area.radius);
                     grad.addColorStop(0, 'rgba(0, 204, 255, 0.2)');
                     grad.addColorStop(1, 'rgba(0, 204, 255, 0)');
@@ -205,7 +220,21 @@
             ctx.restore();
         }
 
+        // Логика джойстика зума (в updatePhysics)
         function updatePhysics() {
+            // Применяем скорость от джойстика (если он не в центре)
+            if (Math.abs(zoomSpeed) > 0.05) {
+                // Если мы зумим джойстиком, зум идет строго в центр экрана
+                let zoomMultiplier = 1 + (zoomSpeed * 0.05); // скорость зума
+                camera.zoom *= zoomMultiplier;
+                
+                // Ограничители
+                camera.zoom = Math.max(0.0001, Math.min(1000000, camera.zoom));
+                
+                let zoomText = camera.zoom < 1 ? `1:${Math.round(1/camera.zoom)}` : `${Math.round(camera.zoom)}x`;
+                document.getElementById("status").innerText = `Масштаб: ${zoomText}`;
+            }
+
             if(!isDragging) {
                 camera.x += velocity.x;
                 camera.y += velocity.y;
@@ -219,7 +248,11 @@
         }
         updatePhysics();
 
+        // Обработка событий холста
         canvas.addEventListener('touchstart', (e) => {
+            // Игнорируем нажатия на джойстик или кнопку
+            if(e.target !== canvas) return;
+            
             if (e.touches.length === 1) {
                 isDragging = true;
                 lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
@@ -231,11 +264,19 @@
                     e.touches[0].clientY - e.touches[1].clientY
                 );
                 initialZoom = camera.zoom;
+                
+                // Находим центр щипка (относительно центра экрана)
+                pinchCenter = {
+                    x: ((e.touches[0].clientX + e.touches[1].clientX) / 2) - canvas.width / 2,
+                    y: ((e.touches[0].clientY + e.touches[1].clientY) / 2) - canvas.height / 2
+                };
             }
         });
 
         canvas.addEventListener('touchmove', (e) => {
+            if(e.target !== canvas) return;
             e.preventDefault(); 
+            
             if (isDragging && e.touches.length === 1) {
                 const currentTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
                 const dx = currentTouch.x - lastTouch.x;
@@ -256,21 +297,71 @@
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                camera.zoom = Math.max(0.0001, Math.min(1000000, initialZoom * (currentDistance / initialPinchDistance)));
                 
-                // Форматирование зума
+                let newZoom = initialZoom * (currentDistance / initialPinchDistance);
+                newZoom = Math.max(0.0001, Math.min(1000000, newZoom));
+                
+                // Зум в точку (чтобы объект оставался под пальцами)
+                let zoomRatio = newZoom / camera.zoom;
+                camera.x += pinchCenter.x / camera.zoom - pinchCenter.x / newZoom;
+                camera.y += pinchCenter.y / camera.zoom - pinchCenter.y / newZoom;
+                
+                camera.zoom = newZoom;
+                
                 let zoomText = camera.zoom < 1 ? `1:${Math.round(1/camera.zoom)}` : `${Math.round(camera.zoom)}x`;
                 document.getElementById("status").innerText = `Масштаб: ${zoomText}`;
             }
         });
 
         canvas.addEventListener('touchend', (e) => {
+            if(e.target !== canvas) return;
             if (e.touches.length === 0) {
                 isDragging = false;
                 initialPinchDistance = null;
             }
         });
 
+        // --- ЛОГИКА ДЖОЙСТИКА (СЛЕВА) ---
+        knob.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isKnobDragging = true;
+            knob.style.transition = 'none'; // отключаем плавный возврат, пока держим
+            try { tg.HapticFeedback.impactOccurred("light"); } catch(e){}
+        });
+
+        sliderContainer.addEventListener('touchmove', (e) => {
+            if (!isKnobDragging) return;
+            e.preventDefault();
+            
+            const rect = sliderContainer.getBoundingClientRect();
+            // Позиция Y относительно центра контейнера
+            let y = e.touches[0].clientY - rect.top;
+            let center = rect.height / 2;
+            
+            // Ограничиваем движение ползунка рамками контейнера
+            let offset = y - center;
+            let maxOffset = (rect.height - 40) / 2; // 40 - размер ползунка
+            offset = Math.max(-maxOffset, Math.min(maxOffset, offset));
+            
+            knob.style.transform = `translateY(calc(-50% + ${offset}px))`;
+            
+            // Вычисляем скорость зума (вверх - минус, отдаляем. Вниз - плюс, приближаем)
+            zoomSpeed = offset / maxOffset; 
+        });
+
+        const releaseKnob = () => {
+            if (!isKnobDragging) return;
+            isKnobDragging = false;
+            zoomSpeed = 0; // останавливаем зум
+            knob.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // эффект пружинки
+            knob.style.transform = `translateY(-50%)`; // возврат в центр
+        };
+
+        knob.addEventListener('touchend', releaseKnob);
+        document.addEventListener('touchend', releaseKnob); // Если палец ушел с джойстика
+
+
+        // --- КНОПКА ПОИСКА ---
         searchBtn.addEventListener('click', () => {
             searchBtn.innerText = "СКАНИРОВАНИЕ...";
             searchBtn.disabled = true;
