@@ -2,91 +2,213 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <!-- Отключаем стандартный зум браузера, чтобы мы могли сделать свой (щипок) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #000; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        #canvas-container { position: relative; width: 90vw; height: 90vw; max-width: 400px; max-height: 400px; border: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00; cursor: crosshair; }
-        canvas { width: 100%; height: 100%; }
-        h2 { margin-bottom: 10px; text-shadow: 0 0 5px #00ff00; }
-        .instructions { font-size: 12px; margin-top: 15px; text-align: center; opacity: 0.8; }
-        #status { margin-top: 10px; height: 20px; font-weight: bold; color: #fff; }
+        body { 
+            margin: 0; padding: 0; background: #050510; color: #00ff00; 
+            font-family: monospace; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; height: 100vh; overflow: hidden; 
+        }
+        #canvas-container { 
+            position: relative; width: 100vw; height: 75vh; 
+            border-bottom: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00; 
+            cursor: crosshair; touch-action: none; /* Блокируем скролл страницы */
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+        .ui-panel {
+            height: 25vh; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; text-align: center;
+            padding: 10px; box-sizing: border-box;
+        }
+        h2 { margin: 0 0 10px 0; text-shadow: 0 0 5px #00ff00; font-size: 20px;}
+        .instructions { font-size: 12px; opacity: 0.8; margin-bottom: 10px;}
+        #status { font-weight: bold; color: #fff; font-size: 14px;}
     </style>
 </head>
 <body>
-    <h2>QUANTUM KEY HUNT</h2>
     <div id="canvas-container">
-        <canvas id="hilbertCanvas"></canvas>
+        <canvas id="spaceCanvas"></canvas>
     </div>
-    <div id="status">Выберите сектор для сканирования</div>
-    <div class="instructions">Пространство ключей свернуто в кривую Гильберта.<br>Доверьтесь интуиции и укажите точку поиска.</div>
+    <div class="ui-panel">
+        <h2>QUANTUM SPACE</h2>
+        <div class="instructions">Перемещайте карту и масштабируйте (щипок).<br>Найдите свою звезду и нажмите на неё.</div>
+        <div id="status">Зум: 1.0x | Жду координат...</div>
+    </div>
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand(); // Открываем на весь экран
+        tg.expand();
 
-        const canvas = document.getElementById("hilbertCanvas");
+        const canvas = document.getElementById("spaceCanvas");
         const ctx = canvas.getContext("2d");
         
-        // Устанавливаем реальное разрешение холста
-        const size = 512;
-        canvas.width = size;
-        canvas.height = size;
-        
-        // Функция для отрисовки красивой сетки/фрактала
-        function drawGrid() {
-            ctx.fillStyle = "#001100";
-            ctx.fillRect(0, 0, size, size);
-            
-            ctx.strokeStyle = "#004400";
-            ctx.lineWidth = 1;
-            
-            // Рисуем сетку матрицы
-            const step = size / 16;
-            for(let i=0; i<size; i+=step) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(size, i); ctx.stroke();
-            }
-            
-            // Имитация фрактала (просто визуальный эффект для старта)
-            ctx.strokeStyle = "#00ff00";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(size/2, size/2, size/3, 0, Math.PI * 2);
-            ctx.stroke();
+        // Настраиваем размер холста под экран
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
         }
-        
-        drawGrid();
+        window.addEventListener('resize', resize);
+        resize();
 
-        // Обработка клика по карте
-        canvas.addEventListener("click", function(e) {
-            const rect = canvas.getBoundingClientRect();
-            // Вычисляем процентные координаты клика (0.00 до 1.00)
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
+        // Камера
+        let camera = { x: 0, y: 0, zoom: 1 };
+        
+        // Переменные для перетаскивания и зума
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let initialPinchDistance = null;
+        let initialZoom = 1;
+
+        // Генерация звезд (космоса) псевдослучайно на основе координат
+        function drawSpace() {
+            ctx.fillStyle = "#050510";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Визуальный эффект прицела
-            drawGrid();
-            ctx.fillStyle = "red";
+            ctx.save();
+            // Смещаем центр в середину экрана
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+
+            // Рисуем сетку для понимания масштаба
+            ctx.strokeStyle = "rgba(0, 255, 0, 0.1)";
+            ctx.lineWidth = 1 / camera.zoom;
+            const gridSize = 100;
+            
+            // Определяем видимую область с учетом зума
+            const left = camera.x - (canvas.width / 2) / camera.zoom;
+            const right = camera.x + (canvas.width / 2) / camera.zoom;
+            const top = camera.y - (canvas.height / 2) / camera.zoom;
+            const bottom = camera.y + (canvas.height / 2) / camera.zoom;
+
+            const startX = Math.floor(left / gridSize) * gridSize;
+            const startY = Math.floor(top / gridSize) * gridSize;
+
             ctx.beginPath();
-            ctx.arc(x * size, y * size, 5, 0, Math.PI * 2);
-            ctx.fill();
+            for (let x = startX; x < right; x += gridSize) {
+                ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+            }
+            for (let y = startY; y < bottom; y += gridSize) {
+                ctx.moveTo(left, y); ctx.lineTo(right, y);
+            }
+            ctx.stroke();
+
+            // Рисуем "звезды" - узлы сетки
+            ctx.fillStyle = "#fff";
+            for (let x = startX; x < right; x += gridSize) {
+                for (let y = startY; y < bottom; y += gridSize) {
+                    // Размер звезды зависит от "удачи" (псевдорандом от координат)
+                    let hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+                    hash = hash - Math.floor(hash);
+                    if(hash > 0.5) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, (hash * 3) / camera.zoom, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+            ctx.restore();
             
-            document.getElementById("status").innerText = "Координаты получены. Отправка...";
+            document.getElementById("status").innerText = `Зум: ${camera.zoom.toFixed(1)}x | X: ${Math.round(camera.x)} Y: ${Math.round(camera.y)}`;
+        }
+
+        drawSpace();
+
+        // Обработка Touch-событий (свайп и щипок)
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                isDragging = false;
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialZoom = camera.zoom;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // блочим скролл
+            if (isDragging && e.touches.length === 1) {
+                const dx = e.touches[0].clientX - dragStart.x;
+                const dy = e.touches[0].clientY - dragStart.y;
+                camera.x -= dx / camera.zoom;
+                camera.y -= dy / camera.zoom;
+                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                drawSpace();
+            } else if (e.touches.length === 2 && initialPinchDistance) {
+                const currentDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                // Меняем зум
+                camera.zoom = Math.max(0.1, Math.min(1000, initialZoom * (currentDistance / initialPinchDistance)));
+                drawSpace();
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+                isDragging = false;
+                initialPinchDistance = null;
+            }
+        });
+
+        // Обработка клика (выбор звезды)
+        let tapTimeout;
+        canvas.addEventListener('touchend', (e) => {
+             // Если это был быстрый тап (не перетаскивание)
+             if(e.changedTouches.length === 0 && !initialPinchDistance) {
+                 // К сожалению, touchend не дает точных координат тапа так же легко, как click.
+                 // Для надежности дублируем логику на click (работает на многих мобилках).
+             }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            // Игнорируем клик, если мы только что перемещали карту
+            if(isDragging) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            // Переводим координаты экрана в координаты мира
+            const worldX = (clientX - canvas.width / 2) / camera.zoom + camera.x;
+            const worldY = (clientY - canvas.height / 2) / camera.zoom + camera.y;
+
+            // Эффект нажатия
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+            
+            ctx.fillStyle = "red";
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "red";
+            ctx.beginPath();
+            ctx.arc(worldX, worldY, 10 / camera.zoom, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            document.getElementById("status").innerText = "Захват цели... Отправка";
             document.getElementById("status").style.color = "red";
             
-            // Вибрация телефона при клике
-            tg.HapticFeedback.impactOccurred("heavy");
+            try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e){}
             
-            // Отправляем координаты обратно в бота
             setTimeout(() => {
                 tg.sendData(JSON.stringify({
-                    action: "scan_sector",
-                    x: x.toFixed(6),
-                    y: y.toFixed(6)
+                    action: "scan_space",
+                    x: worldX.toFixed(2),
+                    y: worldY.toFixed(2),
+                    zoom: camera.zoom.toFixed(2)
                 }));
             }, 500);
         });
+
     </script>
 </body>
 </html>
