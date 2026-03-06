@@ -442,11 +442,19 @@
             scannerUI.style.display = "flex";
             scanStatus.innerText = "АНАЛИЗ СЕКТОРА...";
             
-            // Бегущие цифры (замедлили до 1 раза в секунду, чтобы не мельтешило)
+            // Бегущие цифры (1 раз в 30 секунд, как в реальном поиске)
+            // Но чтобы не было скучно, мы будем мигать статусом "АНАЛИЗ..."
+            let dots = 0;
             scanningInterval = setInterval(() => {
-                let rmd = Array.from({length: 40}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                let priv = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                matrixCode.innerHTML = `CHK: ${rmd}<br>KEY: ************${priv}`;
+                dots = (dots + 1) % 4;
+                scanStatus.innerText = "АНАЛИЗ СЕКТОРА" + ".".repeat(dots);
+                
+                // Раз в 30 тиков (каждые ~30 сек, если интервал 1000мс) обновляем хеш
+                if (dots === 0 && Math.random() > 0.8) {
+                    let rmd = Array.from({length: 40}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                    let priv = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                    matrixCode.innerHTML = `CHK: ${rmd}<br>KEY: ************${priv}`;
+                }
             }, 1000);
 
             // ТУТ ВАЖНЫЙ МОМЕНТ:
