@@ -77,27 +77,28 @@
         .crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 1px; }
         /* Маленький сканер внизу экрана */
         #scanner-ui {
-            position: absolute; bottom: 80px; left: 20px; right: 20px;
-            background: rgba(0, 5, 20, 0.8); border: 1px solid #00ccff;
+            position: absolute; bottom: 90px; right: 20px; width: calc(100vw - 110px);
+            background: rgba(0, 5, 20, 0.85); border: 1px solid #00ccff;
             border-radius: 10px; padding: 10px; display: none;
             flex-direction: column; z-index: 100; box-shadow: 0 0 10px rgba(0,204,255,0.3);
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px); box-sizing: border-box;
         }
         .matrix-text {
-            font-size: 12px; color: #00ccff; font-family: monospace; 
-            margin-bottom: 5px; word-break: break-all;
+            font-size: 11px; color: #00ccff; font-family: monospace; 
+            margin-bottom: 5px; word-break: break-all; line-height: 1.4;
         }
         .scan-status {
-            font-size: 10px; color: #fff; opacity: 0.8;
+            font-size: 10px; color: #fff; opacity: 0.8; text-transform: uppercase;
         }
         
         .close-btn {
-            position: absolute; top: 20px; right: 20px;
-            background: rgba(255, 0, 0, 0.2); border: 1px solid red; color: red;
-            width: 30px; height: 30px; border-radius: 15px; font-weight: bold;
+            position: absolute; top: 15px; right: 15px;
+            background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.5); color: #ff3333;
+            width: 32px; height: 32px; border-radius: 16px; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; z-index: 200;
+            cursor: pointer; z-index: 200; font-family: sans-serif;
         }
+        .close-btn:active { background: rgba(255, 0, 0, 0.3); }
     </style>
 </head>
 <body>
@@ -392,17 +393,38 @@
 
         // --- КНОПКА ЗАКРЫТЬ ---
         document.getElementById("closeBtn").addEventListener('click', () => {
-            tg.close();
+            if(tg) tg.close();
         });
 
-        // --- КНОПКА ПОИСКА ---
+        // --- КНОПКА ПОИСКА (СТАРТ / СТОП) ---
         let scanningInterval = null;
         
         searchBtn.addEventListener('click', () => {
-            if (scanningInterval) return; // Уже сканируем
+            const scannerUI = document.getElementById("scanner-ui");
+            const matrixCode = document.getElementById("matrixCode");
+            const scanStatus = document.getElementById("scanStatus");
             
-            searchBtn.innerText = "ИДЕТ ПОИСК...";
-            searchBtn.style.background = "rgba(0, 204, 255, 0.4)";
+            // Если уже сканируем - ОСТАНАВЛИВАЕМ
+            if (scanningInterval) {
+                clearInterval(scanningInterval);
+                scanningInterval = null;
+                searchBtn.innerText = "ПОИСК";
+                searchBtn.style.background = "rgba(0, 204, 255, 0.1)";
+                searchBtn.style.color = "#00ccff";
+                scanStatus.innerText = "СКАНИРОВАНИЕ ОСТАНОВЛЕНО";
+                
+                // Прячем панель через пару секунд
+                setTimeout(() => {
+                    if(!scanningInterval) scannerUI.style.display = "none";
+                }, 2000);
+                return;
+            }
+            
+            // НАЧИНАЕМ СКАНИРОВАНИЕ
+            searchBtn.innerText = "ОСТАНОВИТЬ";
+            searchBtn.style.background = "rgba(255, 0, 0, 0.2)";
+            searchBtn.style.borderColor = "red";
+            searchBtn.style.color = "red";
             
             try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e){}
             
@@ -417,24 +439,21 @@
             if(scannedAreas.length > 100) scannedAreas.shift();
             localStorage.setItem('scannedAreas', JSON.stringify(scannedAreas));
 
-            // Показываем терминал внизу
-            const scannerUI = document.getElementById("scanner-ui");
-            const matrixCode = document.getElementById("matrixCode");
-            
+            // Показываем терминал
             scannerUI.style.display = "flex";
+            scanStatus.innerText = "АНАЛИЗ СЕКТОРА...";
             
-            // Бесконечный бег цифр
+            // Бегущие цифры (замедлили до 1 раза в секунду, чтобы не мельтешило)
             scanningInterval = setInterval(() => {
                 let rmd = Array.from({length: 40}, () => Math.floor(Math.random()*16).toString(16)).join('');
                 let priv = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                matrixCode.innerHTML = `CHK RMD160: ${rmd}<br>KEY: ************${priv}`;
-            }, 50);
+                matrixCode.innerHTML = `CHK: ${rmd}<br>KEY: ************${priv}`;
+            }, 1000);
 
             // ТУТ ВАЖНЫЙ МОМЕНТ:
             // Telegram API (tg.sendData) автоматически закрывает приложение при вызове!
             // Чтобы отправлять данные боту БЕЗ ЗАКРЫТИЯ окна, нам нужно будет сделать 
             // отдельный веб-сервер (API) и слать туда данные через обычный fetch() запрос в фоне.
-            // Пока я отключила sendData, чтобы ты мог посмотреть бесконечную анимацию!
             
         });
 
