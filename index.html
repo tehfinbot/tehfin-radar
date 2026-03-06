@@ -268,8 +268,8 @@
             if(!isDragging) {
                 camera.x += velocity.x;
                 camera.y += velocity.y;
-                velocity.x *= 0.96;
-                velocity.y *= 0.96;
+                velocity.x *= 0.98;
+                velocity.y *= 0.98;
                 if(Math.abs(velocity.x) < 0.01 / camera.zoom) velocity.x = 0;
                 if(Math.abs(velocity.y) < 0.01 / camera.zoom) velocity.y = 0;
             }
