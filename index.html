@@ -1,468 +1,222 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quantum Key Hunt 16x16</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { 
-            margin: 0; padding: 0; background: #010514; color: #00ccff; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            overflow: hidden; touch-action: none;
+        body {
+            margin: 0; padding: 0; background: #0a0e17; color: #00ccff;
+            font-family: monospace; display: flex; flex-direction: column;
+            align-items: center; height: 100vh; overflow: hidden; touch-action: manipulation;
         }
-        #spaceCanvas { width: 100vw; height: 100vh; display: block; }
-        
-        .ui-layer {
-            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none;
-        }
-        
-        #header {
-            position: absolute; top: 20px; left: 0; width: 100%; text-align: center;
-            text-shadow: 0 0 10px rgba(0, 204, 255, 0.5); pointer-events: none;
-        }
-        h2 { margin: 0; font-size: 24px; letter-spacing: 2px;}
-        .subtitle { font-size: 12px; opacity: 0.7; color: #fff; }
-        
-        /* Кнопка ПОИСК справа */
-        .btn-search {
-            position: absolute; bottom: 30px; right: 20px;
-            background: rgba(0, 204, 255, 0.1); border: 1px solid #00ccff; color: #00ccff; 
-            padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 30px;
-            box-shadow: 0 0 15px rgba(0, 204, 255, 0.3); cursor: pointer; text-transform: uppercase;
-            backdrop-filter: blur(5px); pointer-events: auto; transition: all 0.2s;
-        }
-        .btn-search:active { background: rgba(0, 204, 255, 0.3); box-shadow: 0 0 25px rgba(0, 204, 255, 0.6); transform: scale(0.95); }
-        .btn-search:disabled { border-color: #555; color: #555; box-shadow: none; pointer-events: none; }
-        
-        /* Джойстик ЗУМА слева */
-        #zoom-slider-container {
-            position: absolute; bottom: 30px; left: 20px;
-            width: 50px; height: 150px;
-            background: rgba(0, 204, 255, 0.1);
-            border: 1px solid rgba(0, 204, 255, 0.3);
-            border-radius: 25px;
-            backdrop-filter: blur(5px);
-            pointer-events: auto;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        
-        #zoom-knob {
-            position: absolute; top: 50%; left: 5px;
-            width: 40px; height: 40px;
-            background: #00ccff;
-            border-radius: 50%;
-            transform: translateY(-50%);
-            box-shadow: 0 0 15px #00ccff;
-            cursor: ns-resize;
-            transition: transform 0.1s ease-out; /* Плавный возврат в центр */
-        }
-        
-        .zoom-icon {
-            color: rgba(0, 204, 255, 0.5); font-weight: bold; font-size: 20px;
-            position: absolute; pointer-events: none;
-        }
-        .zoom-plus { top: 10px; }
-        .zoom-minus { bottom: 10px; }
 
-        /* Прицел по центру экрана */
-        .crosshair {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 60vw; height: 60vw; border: 1px solid rgba(0, 204, 255, 0.3); border-radius: 20px;
-            pointer-events: none; box-shadow: inset 0 0 20px rgba(0, 204, 255, 0.1);
+        .header {
+            width: 100%; text-align: center; padding: 15px 0;
+            background: #0d1326; border-bottom: 2px solid #00ccff;
+            box-shadow: 0 4px 15px rgba(0, 204, 255, 0.2);
+            position: relative;
         }
-        .crosshair::before, .crosshair::after {
-            content: ''; position: absolute; background: rgba(0, 204, 255, 0.5);
+
+        h1 { margin: 0; font-size: 20px; letter-spacing: 2px; text-shadow: 0 0 10px #00ccff; }
+
+        .close-btn {
+            position: absolute; top: 10px; right: 15px;
+            background: rgba(255, 50, 50, 0.2); border: 1px solid #ff3333; color: #ff3333;
+            width: 30px; height: 30px; border-radius: 5px; font-weight: bold; font-family: sans-serif;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
-        .crosshair::before { top: 50%; left: -10px; right: -10px; height: 1px; }
-        .crosshair::after { left: 50%; top: -10px; bottom: -10px; width: 1px; }
-        // Маленький сканер внизу экрана, не перекрывающий джойстик
-        #scanner-ui {
-            position: absolute; bottom: 30px; left: 80px; right: 140px; /* Сдвинули от джойстика и кнопки */
-            background: rgba(0, 5, 20, 0.9); border: 1px solid #00ccff;
-            border-radius: 10px; padding: 8px; display: none;
-            flex-direction: column; z-index: 100; box-shadow: 0 0 10px rgba(0,204,255,0.3);
+
+        /* КОНТЕЙНЕР МАТРИЦЫ */
+        .matrix-container {
+            margin-top: 20px;
+            display: grid;
+            /* 16 колонок */
+            grid-template-columns: repeat(16, 1fr);
+            /* Размер сетки зависит от ширины экрана, чтобы была квадратной */
+            width: 90vw; max-width: 400px;
+            height: 90vw; max-height: 400px;
+            gap: 1px;
+            background: #1a2540;
+            border: 2px solid #00ccff;
+            padding: 2px;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 204, 255, 0.1);
         }
-        .matrix-text {
-            font-size: 10px; color: #00ccff; font-family: monospace; 
-            margin-bottom: 2px; word-break: break-all;
+
+        /* Квадратик (Бит) */
+        .bit {
+            background: #33415c; /* 0 - выключен (серый) */
+            border-radius: 2px;
+            transition: background 0.1s;
         }
-        .scan-status {
-            font-size: 9px; color: #fff; opacity: 0.8; text-transform: uppercase;
+        .bit.active {
+            background: #00ccff; /* 1 - включен (неон) */
+            box-shadow: 0 0 5px #00ccff;
+        }
+
+        /* Панель управления под матрицей */
+        .controls {
+            margin-top: 20px; width: 90vw; max-width: 400px;
+            display: flex; justify-content: space-between; gap: 10px;
         }
         
-        .close-btn {
-            position: absolute; top: 15px; right: 15px;
-            background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.5); color: #ff3333;
-            width: 32px; height: 32px; border-radius: 16px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; z-index: 200; font-family: sans-serif;
+        .btn {
+            flex: 1; padding: 12px; font-family: monospace; font-size: 16px; font-weight: bold;
+            border: 1px solid #00ccff; border-radius: 8px; cursor: pointer;
+            text-transform: uppercase; transition: all 0.2s;
         }
-        .close-btn:active { background: rgba(255, 0, 0, 0.3); }
+        
+        .btn-rand { background: rgba(0, 204, 255, 0.1); color: #00ccff; }
+        .btn-rand:active { background: rgba(0, 204, 255, 0.3); }
+
+        .btn-scan { background: #00ccff; color: #0a0e17; box-shadow: 0 0 15px rgba(0, 204, 255, 0.5); }
+        .btn-scan:active { transform: scale(0.95); }
+        .btn-scan:disabled { background: #555; border-color: #555; color: #222; box-shadow: none; }
+
+        /* Отображение ключа */
+        .key-display {
+            margin-top: 20px; width: 90vw; max-width: 400px;
+            background: #0d1326; border: 1px solid #33415c; border-radius: 5px;
+            padding: 10px; box-sizing: border-box;
+        }
+        .key-title { font-size: 10px; color: #8898aa; margin-bottom: 5px; }
+        .key-hex { 
+            font-size: 11px; color: #00ccff; word-break: break-all; 
+            line-height: 1.4; user-select: all;
+        }
+
     </style>
 </head>
 <body>
-    <canvas id="spaceCanvas"></canvas>
-    
-    <div class="ui-layer">
-        <div class="close-btn" id="closeBtn">X</div>
-        <div id="header">
-            <h2>QUANTUM SPACE</h2>
-            <div class="subtitle" id="status">Наведи сканер и нажми поиск</div>
-        </div>
-        
-        <div class="crosshair"></div>
-        
-        <div id="zoom-slider-container">
-            <div class="zoom-icon zoom-plus">+</div>
-            <div class="zoom-icon zoom-minus">-</div>
-            <div id="zoom-knob"></div>
-        </div>
 
-        <button id="searchBtn" class="btn-search">ПОИСК</button>
+    <div class="header">
+        <h1>KEY HUNTER</h1>
+        <div class="close-btn" id="closeBtn">X</div>
     </div>
 
-    <div id="scanner-ui">
-        <div class="matrix-text" id="matrixCode">0x00000000...</div>
-        <div class="scan-status" id="scanStatus">СКАНИРОВАНИЕ СЕКТОРА...</div>
+    <div class="matrix-container" id="matrix">
+        <!-- Квадратики сгенерируются через JS -->
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-rand" id="btnRand">🎲 РАНДОМ</button>
+        <button class="btn btn-scan" id="btnScan">СКАН</button>
+    </div>
+
+    <div class="key-display">
+        <div class="key-title">ПРИВАТНЫЙ КЛЮЧ (HEX)</div>
+        <div class="key-hex" id="keyHex">0000000000000000000000000000000000000000000000000000000000000000</div>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        tg.enableClosingConfirmation();
+        
+        const matrix = document.getElementById('matrix');
+        const keyHexDisplay = document.getElementById('keyHex');
+        const btnRand = document.getElementById('btnRand');
+        const btnScan = document.getElementById('btnScan');
+        
+        // Массив 256 бит (0 или 1)
+        let bits = new Array(256).fill(0);
+        let bitElements = [];
 
-        const canvas = document.getElementById("spaceCanvas");
-        const ctx = canvas.getContext("2d");
-        const searchBtn = document.getElementById("searchBtn");
-        
-        // Переменные для джойстика
-        const knob = document.getElementById("zoom-knob");
-        const sliderContainer = document.getElementById("zoom-slider-container");
-        let isKnobDragging = false;
-        let zoomSpeed = 0; // от -1 до 1
-        
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        let camera = { x: 0, y: 0, zoom: 1 };
-        let velocity = { x: 0, y: 0 };
-        
-        let isDragging = false;
-        let lastTouch = null;
-        let initialPinchDistance = null;
-        let initialZoom = 1;
-        // Координаты центра экрана при начале зума (для правильного скейла в точку)
-        let pinchCenter = {x: 0, y: 0};
-        
-        let scannedAreas = JSON.parse(localStorage.getItem('scannedAreas') || '[]');
-
-        function pseudoRandom(x, y) {
-            let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-            return h - Math.floor(h);
+        // Функция перевода бинарного массива в HEX-строку (64 символа)
+        function updateHexDisplay() {
+            let hexString = "";
+            // Берем по 4 бита и превращаем в один hex-символ (полубайт/ниббл)
+            for (let i = 0; i < 256; i += 4) {
+                let nibble = (bits[i] << 3) | (bits[i+1] << 2) | (bits[i+2] << 1) | bits[i+3];
+                hexString += nibble.toString(16);
+            }
+            keyHexDisplay.innerText = hexString;
+            return hexString;
         }
 
-        function draw() {
-            ctx.fillStyle = "#010514";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.save();
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.scale(camera.zoom, camera.zoom);
-            ctx.translate(-camera.x, -camera.y);
-
-            const viewLeft = camera.x - (canvas.width / 2) / camera.zoom;
-            const viewRight = camera.x + (canvas.width / 2) / camera.zoom;
-            const viewTop = camera.y - (canvas.height / 2) / camera.zoom;
-            const viewBottom = camera.y + (canvas.height / 2) / camera.zoom;
-
-            let baseL = Math.floor(Math.log2(camera.zoom));
-            
-            for(let l = baseL - 2; l <= baseL + 1; l++) {
-                let gridSize = 1000 / Math.pow(2, l);
-                let layerAlpha = 1 - Math.abs((Math.log2(camera.zoom) - l - 0.5));
-                if (layerAlpha <= 0) continue;
-
-                let startX = Math.floor(viewLeft / gridSize) * gridSize;
-                let startY = Math.floor(viewTop / gridSize) * gridSize;
-
-                for (let x = startX; x < viewRight; x += gridSize) {
-                    for (let y = startY; y < viewBottom; y += gridSize) {
-                        let hash1 = pseudoRandom(x, y);
-                        if(hash1 > 0.4) {
-                            let hash2 = pseudoRandom(x + 1, y + 1);
-                            let hash3 = pseudoRandom(x + 2, y + 2);
-                            
-                            let starX = x + hash2 * gridSize;
-                            let starY = y + hash3 * gridSize;
-                            
-                            let depth = 1 - (hash1 * 0.5); 
-                            
-                            let px = starX + camera.x * (1 - depth);
-                            let py = starY + camera.y * (1 - depth);
-
-                            if (px > viewLeft && px < viewRight && py > viewTop && py < viewBottom) {
-                                ctx.fillStyle = `rgba(200, 230, 255, ${layerAlpha * hash1})`;
-                                ctx.beginPath();
-                                let radius = (hash2 * 2 + 0.5) / camera.zoom * Math.pow(2, l - baseL + 1);
-                                ctx.arc(px, py, Math.max(0.5 / camera.zoom, Math.min(5/camera.zoom, radius)), 0, Math.PI * 2);
-                                ctx.fill();
-                            }
-                        }
+        // Создаем 256 DIV'ов (16x16)
+        function initMatrix() {
+            for (let i = 0; i < 256; i++) {
+                let bitDiv = document.createElement('div');
+                bitDiv.className = 'bit';
+                
+                // Обработка клика/тапа по квадратику
+                bitDiv.addEventListener('pointerdown', (e) => {
+                    e.preventDefault(); // чтобы не было двойных срабатываний на тач
+                    toggleBit(i);
+                });
+                // Позволяем "рисовать" проводя пальцем (свайп по сетке)
+                bitDiv.addEventListener('pointerenter', (e) => {
+                    if (e.buttons > 0) { // если кнопка мыши/палец зажат
+                        toggleBit(i);
                     }
-                }
-            }
+                });
 
-            // Рисуем просканированные зоны
-            for(let area of scannedAreas) {
-                ctx.save();
-                ctx.translate(area.x, area.y);
-                
-                let screenRadius = area.radius * camera.zoom;
-                
-                if (screenRadius < 10) {
-                    ctx.fillStyle = "#ffaa00"; 
-                    ctx.shadowBlur = 10 / camera.zoom;
-                    ctx.shadowColor = "#ffaa00";
-                    ctx.beginPath();
-                    ctx.arc(0, 0, 5 / camera.zoom, 0, Math.PI * 2);
-                    ctx.fill();
+                matrix.appendChild(bitDiv);
+                bitElements.push(bitDiv);
+            }
+            updateHexDisplay();
+        }
+
+        // Переключение бита
+        function toggleBit(index) {
+            bits[index] = bits[index] === 0 ? 1 : 0;
+            if (bits[index] === 1) {
+                bitElements[index].classList.add('active');
+            } else {
+                bitElements[index].classList.remove('active');
+            }
+            try { tg.HapticFeedback.impactOccurred("light"); } catch(e) {}
+            updateHexDisplay();
+        }
+
+        // Рандомизация всей сетки
+        btnRand.addEventListener('click', () => {
+            try { tg.HapticFeedback.impactOccurred("medium"); } catch(e) {}
+            for (let i = 0; i < 256; i++) {
+                bits[i] = Math.random() > 0.5 ? 1 : 0;
+                if (bits[i] === 1) {
+                    bitElements[i].classList.add('active');
                 } else {
-                    let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, area.radius);
-                    grad.addColorStop(0, 'rgba(0, 204, 255, 0.2)');
-                    grad.addColorStop(1, 'rgba(0, 204, 255, 0)');
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, area.radius, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    ctx.strokeStyle = "rgba(0, 204, 255, 0.4)";
-                    ctx.lineWidth = 2 / camera.zoom;
-                    ctx.strokeRect(-area.radius/2, -area.radius/2, area.radius, area.radius);
+                    bitElements[i].classList.remove('active');
                 }
-                ctx.restore();
             }
-
-            ctx.restore();
-        }
-
-        // Логика джойстика зума (в updatePhysics)
-        function updatePhysics() {
-            // Применяем скорость от джойстика (если он не в центре)
-            if (Math.abs(zoomSpeed) > 0.05) {
-                // Если мы зумим джойстиком, зум идет строго в центр экрана
-                let zoomMultiplier = 1 + (zoomSpeed * 0.05); // скорость зума
-                camera.zoom *= zoomMultiplier;
-                
-                // Ограничители
-                camera.zoom = Math.max(0.0001, Math.min(1000000, camera.zoom));
-                
-                let zoomText = camera.zoom < 1 ? `1:${Math.round(1/camera.zoom)}` : `${Math.round(camera.zoom)}x`;
-                document.getElementById("status").innerText = `Масштаб: ${zoomText}`;
-            }
-
-            if(!isDragging) {
-                camera.x += velocity.x;
-                camera.y += velocity.y;
-                velocity.x *= 0.98;
-                velocity.y *= 0.98;
-                if(Math.abs(velocity.x) < 0.01 / camera.zoom) velocity.x = 0;
-                if(Math.abs(velocity.y) < 0.01 / camera.zoom) velocity.y = 0;
-            }
-            draw();
-            requestAnimationFrame(updatePhysics);
-        }
-        updatePhysics();
-
-        // Обработка событий холста
-        canvas.addEventListener('touchstart', (e) => {
-            // Игнорируем нажатия на джойстик или кнопку
-            if(e.target !== canvas) return;
-            
-            if (e.touches.length === 1) {
-                isDragging = true;
-                lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
-                velocity = { x: 0, y: 0 };
-            } else if (e.touches.length === 2) {
-                isDragging = false;
-                initialPinchDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                initialZoom = camera.zoom;
-                
-                // Находим центр щипка (относительно центра экрана)
-                pinchCenter = {
-                    x: ((e.touches[0].clientX + e.touches[1].clientX) / 2) - canvas.width / 2,
-                    y: ((e.touches[0].clientY + e.touches[1].clientY) / 2) - canvas.height / 2
-                };
-            }
+            updateHexDisplay();
         });
 
-        canvas.addEventListener('touchmove', (e) => {
-            if(e.target !== canvas) return;
-            e.preventDefault(); 
+        // Отправка ключа боту
+        btnScan.addEventListener('click', () => {
+            const finalHex = updateHexDisplay();
             
-            if (isDragging && e.touches.length === 1) {
-                const currentTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
-                const dx = currentTouch.x - lastTouch.x;
-                const dy = currentTouch.y - lastTouch.y;
-                const dt = currentTouch.time - lastTouch.time;
-                
-                camera.x -= dx / camera.zoom;
-                camera.y -= dy / camera.zoom;
-                
-                if(dt > 0) {
-                    velocity.x = -(dx / camera.zoom) / dt * 15;
-                    velocity.y = -(dy / camera.zoom) / dt * 15;
-                }
-                lastTouch = currentTouch;
-                
-            } else if (e.touches.length === 2 && initialPinchDistance) {
-                const currentDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                
-                let newZoom = initialZoom * (currentDistance / initialPinchDistance);
-                newZoom = Math.max(0.0001, Math.min(1000000, newZoom));
-                
-                // Зум в точку (чтобы объект оставался под пальцами)
-                let zoomRatio = newZoom / camera.zoom;
-                camera.x += pinchCenter.x / camera.zoom - pinchCenter.x / newZoom;
-                camera.y += pinchCenter.y / camera.zoom - pinchCenter.y / newZoom;
-                
-                camera.zoom = newZoom;
-                
-                let zoomText = camera.zoom < 1 ? `1:${Math.round(1/camera.zoom)}` : `${Math.round(camera.zoom)}x`;
-                document.getElementById("status").innerText = `Масштаб: ${zoomText}`;
-            }
+            btnScan.disabled = true;
+            btnScan.innerText = "ИДЕТ ПОИСК...";
+            try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e) {}
+            
+            // В боевом режиме тут мы шлем fetch() к нашему API без закрытия окна.
+            // Пока шлем через sendData, чтобы бот получил HEX
+            setTimeout(() => {
+                tg.sendData(JSON.stringify({
+                    action: "scan_16x16",
+                    private_key: finalHex
+                }));
+                // Сброс кнопки
+                setTimeout(() => {
+                    btnScan.disabled = false;
+                    btnScan.innerText = "СКАН";
+                }, 1000);
+            }, 500);
         });
 
-        canvas.addEventListener('touchend', (e) => {
-            if(e.target !== canvas) return;
-            if (e.touches.length === 0) {
-                isDragging = false;
-                initialPinchDistance = null;
-            }
-        });
-
-        // --- ЛОГИКА ДЖОЙСТИКА (СЛЕВА) ---
-        knob.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isKnobDragging = true;
-            knob.style.transition = 'none'; // отключаем плавный возврат, пока держим
-            try { tg.HapticFeedback.impactOccurred("light"); } catch(e){}
-        });
-
-        sliderContainer.addEventListener('touchmove', (e) => {
-            if (!isKnobDragging) return;
-            e.preventDefault();
-            
-            const rect = sliderContainer.getBoundingClientRect();
-            // Позиция Y относительно центра контейнера
-            let y = e.touches[0].clientY - rect.top;
-            let center = rect.height / 2;
-            
-            // Ограничиваем движение ползунка рамками контейнера
-            let offset = y - center;
-            let maxOffset = (rect.height - 40) / 2; // 40 - размер ползунка
-            offset = Math.max(-maxOffset, Math.min(maxOffset, offset));
-            
-            knob.style.transform = `translateY(calc(-50% + ${offset}px))`;
-            
-            // Вычисляем скорость зума (вверх - минус, отдаляем. Вниз - плюс, приближаем)
-            zoomSpeed = offset / maxOffset; 
-        });
-
-        const releaseKnob = () => {
-            if (!isKnobDragging) return;
-            isKnobDragging = false;
-            zoomSpeed = 0; // останавливаем зум
-            knob.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // эффект пружинки
-            knob.style.transform = `translateY(-50%)`; // возврат в центр
-        };
-
-        knob.addEventListener('touchend', releaseKnob);
-        document.addEventListener('touchend', releaseKnob); // Если палец ушел с джойстика
-
-
-        // --- КНОПКА ЗАКРЫТЬ ---
-        document.getElementById("closeBtn").addEventListener('click', () => {
+        document.getElementById('closeBtn').addEventListener('click', () => {
             if(tg) tg.close();
         });
 
-        // --- КНОПКА ПОИСКА (СТАРТ / СТОП) ---
-        let scanningInterval = null;
+        // Запуск
+        initMatrix();
         
-        searchBtn.addEventListener('click', () => {
-            const scannerUI = document.getElementById("scanner-ui");
-            const matrixCode = document.getElementById("matrixCode");
-            const scanStatus = document.getElementById("scanStatus");
-            
-            // Если уже сканируем - ОСТАНАВЛИВАЕМ
-            if (scanningInterval) {
-                clearInterval(scanningInterval);
-                scanningInterval = null;
-                searchBtn.innerText = "ПОИСК";
-                searchBtn.style.background = "rgba(0, 204, 255, 0.1)";
-                searchBtn.style.color = "#00ccff";
-                scanStatus.innerText = "СКАНИРОВАНИЕ ОСТАНОВЛЕНО";
-                
-                // Прячем панель через пару секунд
-                setTimeout(() => {
-                    if(!scanningInterval) scannerUI.style.display = "none";
-                }, 2000);
-                return;
-            }
-            
-            // НАЧИНАЕМ СКАНИРОВАНИЕ
-            searchBtn.innerText = "ОСТАНОВИТЬ";
-            searchBtn.style.background = "rgba(255, 0, 0, 0.2)";
-            searchBtn.style.borderColor = "red";
-            searchBtn.style.color = "red";
-            
-            try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e){}
-            
-            const viewWidth = canvas.width / camera.zoom;
-            const scanRadius = viewWidth * 0.4;
-            
-            scannedAreas.push({
-                x: camera.x,
-                y: camera.y,
-                radius: scanRadius
-            });
-            if(scannedAreas.length > 100) scannedAreas.shift();
-            localStorage.setItem('scannedAreas', JSON.stringify(scannedAreas));
-
-            // Показываем терминал
-            scannerUI.style.display = "flex";
-            scanStatus.innerText = "АНАЛИЗ СЕКТОРА...";
-            
-            // Бегущие цифры (1 раз в 30 секунд, как в реальном поиске)
-            // Но чтобы не было скучно, мы будем мигать статусом "АНАЛИЗ..."
-            let dots = 0;
-            scanningInterval = setInterval(() => {
-                dots = (dots + 1) % 4;
-                scanStatus.innerText = "АНАЛИЗ СЕКТОРА" + ".".repeat(dots);
-                
-                // Раз в 30 тиков (каждые ~30 сек, если интервал 1000мс) обновляем хеш
-                if (dots === 0 && Math.random() > 0.8) {
-                    let rmd = Array.from({length: 40}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                    let priv = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                    matrixCode.innerHTML = `CHK: ${rmd}<br>KEY: ************${priv}`;
-                }
-            }, 1000);
-
-            // ТУТ ВАЖНЫЙ МОМЕНТ:
-            // Telegram API (tg.sendData) автоматически закрывает приложение при вызове!
-            // Чтобы отправлять данные боту БЕЗ ЗАКРЫТИЯ окна, нам нужно будет сделать 
-            // отдельный веб-сервер (API) и слать туда данные через обычный fetch() запрос в фоне.
-            
-        });
+        // Сразу делаем случайный паттерн при старте
+        btnRand.click();
 
     </script>
 </body>
