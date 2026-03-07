@@ -3,123 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Quantum Key Hunt 16x16</title>
+    <title>TehFin Quantum Hunt</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             margin: 0; padding: 0; background: #0a0e17; color: #00ccff;
             font-family: monospace; display: flex; flex-direction: column;
-            align-items: center; height: 100vh; overflow: hidden; touch-action: manipulation;
+            align-items: center; justify-content: flex-start; height: 100vh; 
+            overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
         }
 
-        /* КОНТЕЙНЕР МАТРИЦЫ (В самом верху) */
+        .spacer-top { height: 3vh; width: 100%; }
+
+        /* МАТРИЦА */
         .matrix-container {
-            margin-top: 5vh; /* Небольшой отступ от самого края */
             display: grid;
             grid-template-columns: repeat(16, 1fr);
-            width: 95vw; max-width: 400px;
-            height: 95vw; max-height: 400px;
+            width: 92vw; max-width: 400px;
+            height: 92vw; max-height: 400px;
             gap: 1px;
             background: #1a2540;
             border: 2px solid #00ccff;
-            padding: 2px;
-            border-radius: 5px;
+            padding: 2px; border-radius: 5px;
             box-shadow: 0 0 20px rgba(0, 204, 255, 0.1);
         }
-
         .bit {
-            background: #33415c;
-            border-radius: 2px;
-            transition: background 0.1s;
+            background: #33415c; border-radius: 2px; transition: background 0.1s;
         }
         .bit.active {
-            background: #00ccff;
-            box-shadow: 0 0 5px #00ccff;
+            background: #00ccff; box-shadow: 0 0 5px #00ccff;
         }
 
-        /* ДИАПАЗОН ПОИСКА (Два ползунка) */
+        /* БЛОК ДИАПАЗОНА С ЛУПОЙ */
         .range-container {
-            width: 90vw; max-width: 400px;
-            margin-top: 15px;
-            padding: 10px;
-            background: #0d1326; border: 1px solid #33415c; border-radius: 5px;
-            box-sizing: border-box;
-            text-align: center;
+            width: 92vw; max-width: 400px;
+            margin-top: 15px; padding: 12px 10px;
+            background: #0d1326; border: 1px solid #33415c; border-radius: 8px;
+            box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
         }
-        .range-title { font-size: 10px; color: #8898aa; margin-bottom: 10px; text-transform: uppercase; }
         
-        /* Кастомный двойной слайдер */
+        .range-header {
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .range-title { 
+            font-size: 11px; color: #8898aa; font-weight: bold;
+        }
+        
+        .range-controls {
+            display: flex; gap: 8px;
+        }
+        
+        .btn-zoom {
+            background: rgba(0, 204, 255, 0.1); border: 1px solid #00ccff; color: #00ccff;
+            border-radius: 4px; padding: 3px 8px; font-size: 14px; cursor: pointer;
+            font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-zoom:active { background: rgba(0, 204, 255, 0.3); transform: scale(0.95); }
+        .btn-zoom:disabled { opacity: 0.3; pointer-events: none; border-color: #555; color: #555; }
+
+        /* Слайдер */
+        .slider-wrapper {
+            position: relative; width: 100%; height: 24px; display: flex; align-items: center;
+        }
         .slider-track {
-            position: relative;
-            width: 100%; height: 6px;
-            background: #33415c; border-radius: 3px;
+            position: relative; width: 100%; height: 6px; background: #33415c; border-radius: 3px;
         }
         .slider-range {
-            position: absolute; height: 100%;
-            background: #00ccff; border-radius: 3px;
+            position: absolute; height: 100%; background: #00ccff; border-radius: 3px;
             box-shadow: 0 0 10px #00ccff;
         }
         .thumb {
             position: absolute; top: 50%; transform: translate(-50%, -50%);
-            width: 18px; height: 18px; background: #fff; border: 2px solid #00ccff;
-            border-radius: 50%; cursor: grab; z-index: 2;
+            width: 22px; height: 22px; background: #fff; border: 3px solid #00ccff;
+            border-radius: 50%; cursor: grab; z-index: 2; box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
-        .thumb:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.2); }
+        .thumb:active { transform: translate(-50%, -50%) scale(1.1); background: #e0f7fa;}
+        
+        /* Текстовые границы текущего зума */
+        .zoom-bounds {
+            display: flex; justify-content: space-between;
+            font-size: 9px; color: #556b82; font-family: monospace;
+        }
 
-        /* ОТОБРАЖЕНИЕ КЛЮЧА */
+        /* КЛЮЧ */
         .key-display {
-            margin-top: 15px; width: 90vw; max-width: 400px;
-            background: #0d1326; border: 1px solid #33415c; border-radius: 5px;
-            padding: 10px; box-sizing: border-box; text-align: center;
+            margin-top: 15px; width: 92vw; max-width: 400px;
+            background: #0d1326; border: 1px solid #33415c; border-radius: 8px;
+            padding: 12px; box-sizing: border-box; text-align: center;
         }
-        .key-title { font-size: 10px; color: #8898aa; margin-bottom: 5px; }
+        .key-title { font-size: 10px; color: #8898aa; margin-bottom: 5px; font-weight: bold;}
         .key-hex { 
-            font-size: 11px; color: #00ccff; word-break: break-all; 
-            line-height: 1.4; user-select: all; font-weight: bold;
+            font-size: 12px; color: #00ccff; word-break: break-all; 
+            line-height: 1.4; font-weight: bold; letter-spacing: 1px;
         }
 
-        /* ПАНЕЛЬ КНОПОК */
+        /* КНОПКИ УПРАВЛЕНИЯ */
         .controls {
-            margin-top: 15px; width: 95vw; max-width: 400px;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr); /* 4 колонки */
-            gap: 8px;
+            margin-top: 15px; width: 92vw; max-width: 400px;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
         }
         
         .btn {
-            padding: 10px 5px; font-family: monospace; font-size: 12px; font-weight: bold;
+            padding: 12px 5px; font-family: monospace; font-size: 12px; font-weight: bold;
             border: 1px solid #00ccff; border-radius: 6px; cursor: pointer;
-            text-transform: uppercase; transition: all 0.2s;
-            display: flex; align-items: center; justify-content: center;
+            text-transform: uppercase; transition: all 0.1s;
         }
         
-        /* Кнопка скан занимает 2 ячейки */
         .btn-scan { 
-            grid-column: span 2;
-            background: rgba(0, 204, 255, 0.1); color: #00ccff; 
+            grid-column: span 2; background: rgba(0, 204, 255, 0.15); color: #00ccff; font-size: 14px;
         }
-        .btn-scan:active { transform: scale(0.95); }
+        .btn-scan:active { transform: scale(0.97); background: rgba(0, 204, 255, 0.3); }
         .btn-scan.scanning { 
             background: rgba(255, 50, 50, 0.2); border-color: #ff3333; color: #ff3333; 
-            box-shadow: 0 0 10px rgba(255, 50, 50, 0.5); 
+            box-shadow: inset 0 0 10px rgba(255, 50, 50, 0.3); 
         }
 
-        /* Маленькие кнопки x10, x20 и тд */
         .btn-mini { background: #0d1326; color: #8898aa; border-color: #33415c;}
-        .btn-mini:active { background: #33415c; color: #fff;}
+        .btn-mini:active { background: #33415c; color: #fff; transform: scale(0.95);}
 
     </style>
 </head>
 <body>
 
+    <div class="spacer-top"></div>
     <div class="matrix-container" id="matrix"></div>
 
     <div class="range-container">
-        <div class="range-title">ДИАПАЗОН ПОИСКА: <span id="rangeText">0% - 100%</span></div>
-        <div class="slider-track" id="sliderTrack">
-            <div class="slider-range" id="sliderRange"></div>
-            <div class="thumb" id="thumbMin" style="left: 0%;"></div>
-            <div class="thumb" id="thumbMax" style="left: 100%;"></div>
+        <div class="range-header">
+            <div class="range-title">ДИАПАЗОН: <span id="rangeText" style="color:#00ccff">0% - 100%</span></div>
+            <div class="range-controls">
+                <button class="btn-zoom" id="btnZoomOut" disabled>🔙</button>
+                <button class="btn-zoom" id="btnZoomIn">🔍 УГЛУБИТЬСЯ</button>
+            </div>
+        </div>
+        
+        <div class="slider-wrapper">
+            <div class="slider-track" id="sliderTrack">
+                <div class="slider-range" id="sliderRange"></div>
+                <div class="thumb" id="thumbMin" style="left: 0%;"></div>
+                <div class="thumb" id="thumbMax" style="left: 100%;"></div>
+            </div>
+        </div>
+        
+        <div class="zoom-bounds">
+            <span id="boundLeft">0.000%</span>
+            <span id="boundRight">100.000%</span>
         </div>
     </div>
 
@@ -129,19 +158,18 @@
     </div>
 
     <div class="controls">
-        <button class="btn btn-scan" id="btnScan">СКАН</button>
-        <button class="btn btn-mini" id="btnRand">РАНДОМ</button>
+        <button class="btn btn-scan" id="btnScan">СТАРТ СКАН</button>
+        <button class="btn btn-mini" id="btnRand">🎲 РАНДОМ</button>
         <button class="btn btn-mini">x10</button>
         <button class="btn btn-mini">x50</button>
         <button class="btn btn-mini">x100</button>
         <button class="btn btn-mini">x500</button>
-        <button class="btn btn-mini">VIP</button>
+        <button class="btn btn-mini" style="border-color:#ffaa00; color:#ffaa00">VIP</button>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        // Включаем подтверждение закрытия свайпом
         tg.enableClosingConfirmation();
         
         const matrix = document.getElementById('matrix');
@@ -152,29 +180,63 @@
         let bits = new Array(256).fill(0);
         let bitElements = [];
         let autoScanInterval = null;
-        let isUserDrawing = false; // Флаг для блокировки перерисовки во время свайпа
+        let isUserDrawing = false; 
 
-        // --- ЛОГИКА ДВОЙНОГО ПОЛЗУНКА ---
+        // --- ЛОГИКА ДВОЙНОГО ПОЛЗУНКА И ЗУМА ---
         const sliderTrack = document.getElementById('sliderTrack');
         const sliderRange = document.getElementById('sliderRange');
         const thumbMin = document.getElementById('thumbMin');
         const thumbMax = document.getElementById('thumbMax');
         const rangeText = document.getElementById('rangeText');
+        const boundLeft = document.getElementById('boundLeft');
+        const boundRight = document.getElementById('boundRight');
+        const btnZoomIn = document.getElementById('btnZoomIn');
+        const btnZoomOut = document.getElementById('btnZoomOut');
         
-        let minVal = 0; // от 0 до 1
-        let maxVal = 1; // от 0 до 1
+        // История зума (стек диапазонов)
+        // Каждый элемент - это объект { globalMin, globalMax } (в долях от 0 до 1)
+        let zoomHistory = [{ globalMin: 0, globalMax: 1 }];
+        
+        // Текущие локальные значения ползунков (от 0 до 1 на экране)
+        let localMin = 0; 
+        let localMax = 1;
         let activeThumb = null;
 
+        function getCurrentGlobalRange() {
+            let currentLevel = zoomHistory[zoomHistory.length - 1];
+            let levelWidth = currentLevel.globalMax - currentLevel.globalMin;
+            
+            let actualMin = currentLevel.globalMin + (localMin * levelWidth);
+            let actualMax = currentLevel.globalMin + (localMax * levelWidth);
+            return { actualMin, actualMax };
+        }
+
         function updateSliderUI() {
-            let leftPerc = minVal * 100;
-            let rightPerc = maxVal * 100;
+            // Обновляем визуал ползунков (по локальным координатам экрана)
+            let leftPerc = localMin * 100;
+            let rightPerc = localMax * 100;
             thumbMin.style.left = leftPerc + "%";
             thumbMax.style.left = rightPerc + "%";
             sliderRange.style.left = leftPerc + "%";
             sliderRange.style.width = (rightPerc - leftPerc) + "%";
-            rangeText.innerText = `${Math.round(leftPerc)}% - ${Math.round(rightPerc)}%`;
+            
+            // Обновляем текст абсолютных диапазонов
+            let bounds = getCurrentGlobalRange();
+            
+            // Для красоты форматируем в проценты с кучей нулей (создает эффект хакерства)
+            let decimals = zoomHistory.length * 3; 
+            rangeText.innerText = `${(bounds.actualMin * 100).toFixed(decimals)}% - ${(bounds.actualMax * 100).toFixed(decimals)}%`;
+            
+            // Обновляем границы шкалы
+            let currentLevel = zoomHistory[zoomHistory.length - 1];
+            boundLeft.innerText = `${(currentLevel.globalMin * 100).toFixed(decimals)}%`;
+            boundRight.innerText = `${(currentLevel.globalMax * 100).toFixed(decimals)}%`;
+            
+            // Активность кнопок
+            btnZoomOut.disabled = zoomHistory.length <= 1;
+            // Разрешаем зум внутрь, если выбран не весь экран (есть зазор)
+            btnZoomIn.disabled = (localMax - localMin) > 0.99;
         }
-        updateSliderUI();
 
         function handleSliderMove(e) {
             if (!activeThumb) return;
@@ -182,25 +244,57 @@
             let clientX = e.touches ? e.touches[0].clientX : e.clientX;
             let rect = sliderTrack.getBoundingClientRect();
             let pos = (clientX - rect.left) / rect.width;
-            pos = Math.max(0, Math.min(1, pos)); // Ограничиваем от 0 до 1
+            pos = Math.max(0, Math.min(1, pos)); 
 
             if (activeThumb === thumbMin) {
-                if (pos >= maxVal - 0.05) pos = maxVal - 0.05; // Не даем ползункам пересечься
-                minVal = pos;
+                if (pos >= localMax - 0.02) pos = localMax - 0.02; // Не даем пересечься
+                localMin = pos;
             } else {
-                if (pos <= minVal + 0.05) pos = minVal + 0.05;
-                maxVal = pos;
+                if (pos <= localMin + 0.02) pos = localMin + 0.02;
+                localMax = pos;
             }
             updateSliderUI();
         }
 
-        const startDrag = (thumb) => (e) => { activeThumb = thumb; };
+        const startDrag = (thumb) => (e) => { 
+            activeThumb = thumb; 
+            try { tg.HapticFeedback.impactOccurred("light"); } catch(err){}
+        };
         const stopDrag = () => { activeThumb = null; };
 
         thumbMin.addEventListener('touchstart', startDrag(thumbMin));
         thumbMax.addEventListener('touchstart', startDrag(thumbMax));
+        // Для ПК:
+        thumbMin.addEventListener('mousedown', startDrag(thumbMin));
+        thumbMax.addEventListener('mousedown', startDrag(thumbMax));
+        
         document.addEventListener('touchmove', handleSliderMove, {passive: false});
+        document.addEventListener('mousemove', handleSliderMove);
         document.addEventListener('touchend', stopDrag);
+        document.addEventListener('mouseup', stopDrag);
+
+        // --- ЛОГИКА КНОПОК ЗУМА ---
+        btnZoomIn.addEventListener('click', () => {
+            let bounds = getCurrentGlobalRange();
+            zoomHistory.push({ globalMin: bounds.actualMin, globalMax: bounds.actualMax });
+            // Сбрасываем ползунки на края (теперь мы ВНУТРИ этого куска)
+            localMin = 0;
+            localMax = 1;
+            try { tg.HapticFeedback.impactOccurred("medium"); } catch(err){}
+            updateSliderUI();
+        });
+
+        btnZoomOut.addEventListener('click', () => {
+            if (zoomHistory.length > 1) {
+                zoomHistory.pop();
+                // Возвращаем ползунки в дефолт (можно было бы высчитывать прошлую позицию, но так проще для юзера)
+                localMin = 0;
+                localMax = 1;
+                try { tg.HapticFeedback.impactOccurred("medium"); } catch(err){}
+                updateSliderUI();
+            }
+        });
+
 
         // --- ЛОГИКА МАТРИЦЫ ---
         function updateHexDisplay() {
@@ -224,50 +318,31 @@
             updateHexDisplay();
         }
 
-        // Рисование пальцем (Touch Events на контейнере)
-        matrix.addEventListener('touchstart', (e) => {
-            isUserDrawing = true;
-            handleTouchDraw(e);
-        });
-
+        matrix.addEventListener('touchstart', (e) => { isUserDrawing = true; handleTouchDraw(e); });
         matrix.addEventListener('touchmove', (e) => {
             if (!isUserDrawing) return;
-            e.preventDefault(); // Блокируем скролл страницы
+            e.preventDefault(); 
             handleTouchDraw(e);
         }, {passive: false});
-
-        matrix.addEventListener('touchend', () => {
-            isUserDrawing = false;
-        });
+        matrix.addEventListener('touchend', () => { isUserDrawing = false; });
 
         function handleTouchDraw(e) {
             let touch = e.touches[0];
             let element = document.elementFromPoint(touch.clientX, touch.clientY);
             if (element && element.classList.contains('bit')) {
                 let index = element.dataset.index;
-                // Включаем бит (рисуем единицы)
                 if (bits[index] === 0) {
                     bits[index] = 1;
                     element.classList.add('active');
-                    try { tg.HapticFeedback.selectionChanged(); } catch(err) {}
+                    // Виброотклик отключен при быстром свайпе, чтобы не "жужжало" как дрель
                     updateHexDisplay();
                 }
             }
         }
 
-        // --- ГЕНЕРАЦИЯ ---
-        function generateWithinRange() {
-            // Имитация генерации в пределах диапазона [minVal, maxVal]
-            // Для честного 256-битного числа это сложная математика. 
-            // Для визуала мы генерируем биты, где старшие биты зависят от диапазона.
-            
-            // Если диапазон [0, 1] - полная рандомизация
+        function randomizeMatrix() {
             for (let i = 0; i < 256; i++) {
                 bits[i] = Math.random() > 0.5 ? 1 : 0;
-            }
-            
-            // Отражаем биты на сетке
-            for (let i = 0; i < 256; i++) {
                 if (bits[i] === 1) bitElements[i].classList.add('active');
                 else bitElements[i].classList.remove('active');
             }
@@ -277,7 +352,7 @@
         btnRand.addEventListener('click', () => {
             if(!autoScanInterval) {
                 try { tg.HapticFeedback.impactOccurred("medium"); } catch(e) {}
-                generateWithinRange();
+                randomizeMatrix();
             }
         });
 
@@ -287,35 +362,38 @@
                 // ОСТАНОВИТЬ
                 clearInterval(autoScanInterval);
                 autoScanInterval = null;
-                btnScan.innerText = "СКАН";
+                btnScan.innerText = "СТАРТ СКАН";
                 btnScan.classList.remove('scanning');
                 try { tg.HapticFeedback.impactOccurred("light"); } catch(e) {}
             } else {
                 // НАЧАТЬ
-                btnScan.innerText = "ОСТАНОВИТЬ";
+                btnScan.innerText = "СТОП";
                 btnScan.classList.add('scanning');
                 try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e) {}
                 
-                // Делаем первую генерацию сразу
-                generateWithinRange();
+                randomizeMatrix();
                 
-                // И запускаем цикл каждые 30 секунд
+                // В будущем здесь будет команда для БЭКЕНДА
+                /*
+                let bounds = getCurrentGlobalRange();
+                tg.sendData(JSON.stringify({
+                    action: "start_background_scan",
+                    startPercent: bounds.actualMin,
+                    endPercent: bounds.actualMax
+                }));
+                */
+                
+                // Имитация тактов во фронтенде (для красоты)
                 autoScanInterval = setInterval(() => {
-                    generateWithinRange();
-                    
-                    // Показываем вибрацией, что прошел такт
+                    randomizeMatrix();
                     try { tg.HapticFeedback.notificationOccurred("success"); } catch(e) {}
-                    
-                    // Здесь мы будем отправлять данные боту в фоне через API (позже)
-                    // let currentHex = keyHexDisplay.innerText;
-                    
                 }, 30000);
             }
         });
 
-        // Запуск
         initMatrix();
-        generateWithinRange();
+        randomizeMatrix();
+        updateSliderUI();
 
     </script>
 </body>
