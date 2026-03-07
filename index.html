@@ -12,31 +12,13 @@
             align-items: center; height: 100vh; overflow: hidden; touch-action: manipulation;
         }
 
-        .header {
-            width: 100%; text-align: center; padding: 15px 0;
-            background: #0d1326; border-bottom: 2px solid #00ccff;
-            box-shadow: 0 4px 15px rgba(0, 204, 255, 0.2);
-            position: relative;
-        }
-
-        h1 { margin: 0; font-size: 20px; letter-spacing: 2px; text-shadow: 0 0 10px #00ccff; }
-
-        .close-btn {
-            position: absolute; top: 10px; right: 15px;
-            background: rgba(255, 50, 50, 0.2); border: 1px solid #ff3333; color: #ff3333;
-            width: 30px; height: 30px; border-radius: 5px; font-weight: bold; font-family: sans-serif;
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
-
-        /* КОНТЕЙНЕР МАТРИЦЫ */
+        /* КОНТЕЙНЕР МАТРИЦЫ (В самом верху) */
         .matrix-container {
-            margin-top: 20px;
+            margin-top: 5vh; /* Небольшой отступ от самого края */
             display: grid;
-            /* 16 колонок */
             grid-template-columns: repeat(16, 1fr);
-            /* Размер сетки зависит от ширины экрана, чтобы была квадратной */
-            width: 90vw; max-width: 400px;
-            height: 90vw; max-height: 400px;
+            width: 95vw; max-width: 400px;
+            height: 95vw; max-height: 400px;
             gap: 1px;
             background: #1a2540;
             border: 2px solid #00ccff;
@@ -45,88 +27,184 @@
             box-shadow: 0 0 20px rgba(0, 204, 255, 0.1);
         }
 
-        /* Квадратик (Бит) */
         .bit {
-            background: #33415c; /* 0 - выключен (серый) */
+            background: #33415c;
             border-radius: 2px;
             transition: background 0.1s;
         }
         .bit.active {
-            background: #00ccff; /* 1 - включен (неон) */
+            background: #00ccff;
             box-shadow: 0 0 5px #00ccff;
         }
 
-        /* Панель управления под матрицей */
-        .controls {
-            margin-top: 20px; width: 90vw; max-width: 400px;
-            display: flex; justify-content: space-between; gap: 10px;
-        }
-        
-        .btn {
-            flex: 1; padding: 12px; font-family: monospace; font-size: 16px; font-weight: bold;
-            border: 1px solid #00ccff; border-radius: 8px; cursor: pointer;
-            text-transform: uppercase; transition: all 0.2s;
-        }
-        
-        .btn-rand { background: rgba(0, 204, 255, 0.1); color: #00ccff; }
-        .btn-rand:active { background: rgba(0, 204, 255, 0.3); }
-
-        .btn-scan { background: #00ccff; color: #0a0e17; box-shadow: 0 0 15px rgba(0, 204, 255, 0.5); }
-        .btn-scan:active { transform: scale(0.95); }
-        .btn-scan:disabled { background: #555; border-color: #555; color: #222; box-shadow: none; }
-
-        /* Отображение ключа */
-        .key-display {
-            margin-top: 20px; width: 90vw; max-width: 400px;
+        /* ДИАПАЗОН ПОИСКА (Два ползунка) */
+        .range-container {
+            width: 90vw; max-width: 400px;
+            margin-top: 15px;
+            padding: 10px;
             background: #0d1326; border: 1px solid #33415c; border-radius: 5px;
-            padding: 10px; box-sizing: border-box;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .range-title { font-size: 10px; color: #8898aa; margin-bottom: 10px; text-transform: uppercase; }
+        
+        /* Кастомный двойной слайдер */
+        .slider-track {
+            position: relative;
+            width: 100%; height: 6px;
+            background: #33415c; border-radius: 3px;
+        }
+        .slider-range {
+            position: absolute; height: 100%;
+            background: #00ccff; border-radius: 3px;
+            box-shadow: 0 0 10px #00ccff;
+        }
+        .thumb {
+            position: absolute; top: 50%; transform: translate(-50%, -50%);
+            width: 18px; height: 18px; background: #fff; border: 2px solid #00ccff;
+            border-radius: 50%; cursor: grab; z-index: 2;
+        }
+        .thumb:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.2); }
+
+        /* ОТОБРАЖЕНИЕ КЛЮЧА */
+        .key-display {
+            margin-top: 15px; width: 90vw; max-width: 400px;
+            background: #0d1326; border: 1px solid #33415c; border-radius: 5px;
+            padding: 10px; box-sizing: border-box; text-align: center;
         }
         .key-title { font-size: 10px; color: #8898aa; margin-bottom: 5px; }
         .key-hex { 
             font-size: 11px; color: #00ccff; word-break: break-all; 
-            line-height: 1.4; user-select: all;
+            line-height: 1.4; user-select: all; font-weight: bold;
         }
+
+        /* ПАНЕЛЬ КНОПОК */
+        .controls {
+            margin-top: 15px; width: 95vw; max-width: 400px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 колонки */
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 10px 5px; font-family: monospace; font-size: 12px; font-weight: bold;
+            border: 1px solid #00ccff; border-radius: 6px; cursor: pointer;
+            text-transform: uppercase; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        /* Кнопка скан занимает 2 ячейки */
+        .btn-scan { 
+            grid-column: span 2;
+            background: rgba(0, 204, 255, 0.1); color: #00ccff; 
+        }
+        .btn-scan:active { transform: scale(0.95); }
+        .btn-scan.scanning { 
+            background: rgba(255, 50, 50, 0.2); border-color: #ff3333; color: #ff3333; 
+            box-shadow: 0 0 10px rgba(255, 50, 50, 0.5); 
+        }
+
+        /* Маленькие кнопки x10, x20 и тд */
+        .btn-mini { background: #0d1326; color: #8898aa; border-color: #33415c;}
+        .btn-mini:active { background: #33415c; color: #fff;}
 
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>KEY HUNTER</h1>
-        <div class="close-btn" id="closeBtn">X</div>
-    </div>
+    <div class="matrix-container" id="matrix"></div>
 
-    <div class="matrix-container" id="matrix">
-        <!-- Квадратики сгенерируются через JS -->
-    </div>
-
-    <div class="controls">
-        <button class="btn btn-rand" id="btnRand">🎲 РАНДОМ</button>
-        <button class="btn btn-scan" id="btnScan">СКАН</button>
+    <div class="range-container">
+        <div class="range-title">ДИАПАЗОН ПОИСКА: <span id="rangeText">0% - 100%</span></div>
+        <div class="slider-track" id="sliderTrack">
+            <div class="slider-range" id="sliderRange"></div>
+            <div class="thumb" id="thumbMin" style="left: 0%;"></div>
+            <div class="thumb" id="thumbMax" style="left: 100%;"></div>
+        </div>
     </div>
 
     <div class="key-display">
-        <div class="key-title">ПРИВАТНЫЙ КЛЮЧ (HEX)</div>
+        <div class="key-title">PRIVATE KEY (HEX)</div>
         <div class="key-hex" id="keyHex">0000000000000000000000000000000000000000000000000000000000000000</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-scan" id="btnScan">СКАН</button>
+        <button class="btn btn-mini" id="btnRand">РАНДОМ</button>
+        <button class="btn btn-mini">x10</button>
+        <button class="btn btn-mini">x50</button>
+        <button class="btn btn-mini">x100</button>
+        <button class="btn btn-mini">x500</button>
+        <button class="btn btn-mini">VIP</button>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
+        // Включаем подтверждение закрытия свайпом
+        tg.enableClosingConfirmation();
         
         const matrix = document.getElementById('matrix');
         const keyHexDisplay = document.getElementById('keyHex');
-        const btnRand = document.getElementById('btnRand');
         const btnScan = document.getElementById('btnScan');
+        const btnRand = document.getElementById('btnRand');
         
-        // Массив 256 бит (0 или 1)
         let bits = new Array(256).fill(0);
         let bitElements = [];
+        let autoScanInterval = null;
+        let isUserDrawing = false; // Флаг для блокировки перерисовки во время свайпа
 
-        // Функция перевода бинарного массива в HEX-строку (64 символа)
+        // --- ЛОГИКА ДВОЙНОГО ПОЛЗУНКА ---
+        const sliderTrack = document.getElementById('sliderTrack');
+        const sliderRange = document.getElementById('sliderRange');
+        const thumbMin = document.getElementById('thumbMin');
+        const thumbMax = document.getElementById('thumbMax');
+        const rangeText = document.getElementById('rangeText');
+        
+        let minVal = 0; // от 0 до 1
+        let maxVal = 1; // от 0 до 1
+        let activeThumb = null;
+
+        function updateSliderUI() {
+            let leftPerc = minVal * 100;
+            let rightPerc = maxVal * 100;
+            thumbMin.style.left = leftPerc + "%";
+            thumbMax.style.left = rightPerc + "%";
+            sliderRange.style.left = leftPerc + "%";
+            sliderRange.style.width = (rightPerc - leftPerc) + "%";
+            rangeText.innerText = `${Math.round(leftPerc)}% - ${Math.round(rightPerc)}%`;
+        }
+        updateSliderUI();
+
+        function handleSliderMove(e) {
+            if (!activeThumb) return;
+            e.preventDefault();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let rect = sliderTrack.getBoundingClientRect();
+            let pos = (clientX - rect.left) / rect.width;
+            pos = Math.max(0, Math.min(1, pos)); // Ограничиваем от 0 до 1
+
+            if (activeThumb === thumbMin) {
+                if (pos >= maxVal - 0.05) pos = maxVal - 0.05; // Не даем ползункам пересечься
+                minVal = pos;
+            } else {
+                if (pos <= minVal + 0.05) pos = minVal + 0.05;
+                maxVal = pos;
+            }
+            updateSliderUI();
+        }
+
+        const startDrag = (thumb) => (e) => { activeThumb = thumb; };
+        const stopDrag = () => { activeThumb = null; };
+
+        thumbMin.addEventListener('touchstart', startDrag(thumbMin));
+        thumbMax.addEventListener('touchstart', startDrag(thumbMax));
+        document.addEventListener('touchmove', handleSliderMove, {passive: false});
+        document.addEventListener('touchend', stopDrag);
+
+        // --- ЛОГИКА МАТРИЦЫ ---
         function updateHexDisplay() {
             let hexString = "";
-            // Берем по 4 бита и превращаем в один hex-символ (полубайт/ниббл)
             for (let i = 0; i < 256; i += 4) {
                 let nibble = (bits[i] << 3) | (bits[i+1] << 2) | (bits[i+2] << 1) | bits[i+3];
                 hexString += nibble.toString(16);
@@ -135,88 +213,109 @@
             return hexString;
         }
 
-        // Создаем 256 DIV'ов (16x16)
         function initMatrix() {
             for (let i = 0; i < 256; i++) {
                 let bitDiv = document.createElement('div');
                 bitDiv.className = 'bit';
-                
-                // Обработка клика/тапа по квадратику
-                bitDiv.addEventListener('pointerdown', (e) => {
-                    e.preventDefault(); // чтобы не было двойных срабатываний на тач
-                    toggleBit(i);
-                });
-                // Позволяем "рисовать" проводя пальцем (свайп по сетке)
-                bitDiv.addEventListener('pointerenter', (e) => {
-                    if (e.buttons > 0) { // если кнопка мыши/палец зажат
-                        toggleBit(i);
-                    }
-                });
-
+                bitDiv.dataset.index = i;
                 matrix.appendChild(bitDiv);
                 bitElements.push(bitDiv);
             }
             updateHexDisplay();
         }
 
-        // Переключение бита
-        function toggleBit(index) {
-            bits[index] = bits[index] === 0 ? 1 : 0;
-            if (bits[index] === 1) {
-                bitElements[index].classList.add('active');
-            } else {
-                bitElements[index].classList.remove('active');
+        // Рисование пальцем (Touch Events на контейнере)
+        matrix.addEventListener('touchstart', (e) => {
+            isUserDrawing = true;
+            handleTouchDraw(e);
+        });
+
+        matrix.addEventListener('touchmove', (e) => {
+            if (!isUserDrawing) return;
+            e.preventDefault(); // Блокируем скролл страницы
+            handleTouchDraw(e);
+        }, {passive: false});
+
+        matrix.addEventListener('touchend', () => {
+            isUserDrawing = false;
+        });
+
+        function handleTouchDraw(e) {
+            let touch = e.touches[0];
+            let element = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (element && element.classList.contains('bit')) {
+                let index = element.dataset.index;
+                // Включаем бит (рисуем единицы)
+                if (bits[index] === 0) {
+                    bits[index] = 1;
+                    element.classList.add('active');
+                    try { tg.HapticFeedback.selectionChanged(); } catch(err) {}
+                    updateHexDisplay();
+                }
             }
-            try { tg.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+
+        // --- ГЕНЕРАЦИЯ ---
+        function generateWithinRange() {
+            // Имитация генерации в пределах диапазона [minVal, maxVal]
+            // Для честного 256-битного числа это сложная математика. 
+            // Для визуала мы генерируем биты, где старшие биты зависят от диапазона.
+            
+            // Если диапазон [0, 1] - полная рандомизация
+            for (let i = 0; i < 256; i++) {
+                bits[i] = Math.random() > 0.5 ? 1 : 0;
+            }
+            
+            // Отражаем биты на сетке
+            for (let i = 0; i < 256; i++) {
+                if (bits[i] === 1) bitElements[i].classList.add('active');
+                else bitElements[i].classList.remove('active');
+            }
             updateHexDisplay();
         }
 
-        // Рандомизация всей сетки
         btnRand.addEventListener('click', () => {
-            try { tg.HapticFeedback.impactOccurred("medium"); } catch(e) {}
-            for (let i = 0; i < 256; i++) {
-                bits[i] = Math.random() > 0.5 ? 1 : 0;
-                if (bits[i] === 1) {
-                    bitElements[i].classList.add('active');
-                } else {
-                    bitElements[i].classList.remove('active');
-                }
+            if(!autoScanInterval) {
+                try { tg.HapticFeedback.impactOccurred("medium"); } catch(e) {}
+                generateWithinRange();
             }
-            updateHexDisplay();
         });
 
-        // Отправка ключа боту
+        // --- КНОПКА СКАН (АВТОМАТИЗАЦИЯ 30 сек) ---
         btnScan.addEventListener('click', () => {
-            const finalHex = updateHexDisplay();
-            
-            btnScan.disabled = true;
-            btnScan.innerText = "ИДЕТ ПОИСК...";
-            try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e) {}
-            
-            // В боевом режиме тут мы шлем fetch() к нашему API без закрытия окна.
-            // Пока шлем через sendData, чтобы бот получил HEX
-            setTimeout(() => {
-                tg.sendData(JSON.stringify({
-                    action: "scan_16x16",
-                    private_key: finalHex
-                }));
-                // Сброс кнопки
-                setTimeout(() => {
-                    btnScan.disabled = false;
-                    btnScan.innerText = "СКАН";
-                }, 1000);
-            }, 500);
-        });
-
-        document.getElementById('closeBtn').addEventListener('click', () => {
-            if(tg) tg.close();
+            if (autoScanInterval) {
+                // ОСТАНОВИТЬ
+                clearInterval(autoScanInterval);
+                autoScanInterval = null;
+                btnScan.innerText = "СКАН";
+                btnScan.classList.remove('scanning');
+                try { tg.HapticFeedback.impactOccurred("light"); } catch(e) {}
+            } else {
+                // НАЧАТЬ
+                btnScan.innerText = "ОСТАНОВИТЬ";
+                btnScan.classList.add('scanning');
+                try { tg.HapticFeedback.impactOccurred("heavy"); } catch(e) {}
+                
+                // Делаем первую генерацию сразу
+                generateWithinRange();
+                
+                // И запускаем цикл каждые 30 секунд
+                autoScanInterval = setInterval(() => {
+                    generateWithinRange();
+                    
+                    // Показываем вибрацией, что прошел такт
+                    try { tg.HapticFeedback.notificationOccurred("success"); } catch(e) {}
+                    
+                    // Здесь мы будем отправлять данные боту в фоне через API (позже)
+                    // let currentHex = keyHexDisplay.innerText;
+                    
+                }, 30000);
+            }
         });
 
         // Запуск
         initMatrix();
-        
-        // Сразу делаем случайный паттерн при старте
-        btnRand.click();
+        generateWithinRange();
 
     </script>
 </body>
